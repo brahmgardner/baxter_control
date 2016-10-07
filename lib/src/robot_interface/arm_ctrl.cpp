@@ -6,11 +6,11 @@ using namespace geometry_msgs;
 using namespace baxter_core_msgs;
 
 ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
-                 RobotInterface(_name,_limb, _no_robot), Gripper(_limb, _no_robot),
+                 RobotInterface(_name,_limb, _no_robot),
                  object_id(-1), action(""), sub_state("")
 {
     std::string topic = "/"+getName()+"/state_"+_limb;
-    state_pub = _n.advertise<baxter_collaboration::ArmState>(topic,1);
+    state_pub = _n.advertise<baxter_control::ArmState>(topic,1);
     ROS_INFO("[%s] Created state publisher with name : %s", getLimb().c_str(), topic.c_str());
 
     std::string other_limb = getLimb() == "right" ? "left" : "right";
@@ -23,8 +23,9 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
     service_other_limb = _n.advertiseService(topic, &ArmCtrl::serviceOtherLimbCb,this);
     ROS_INFO("[%s] Created service server with name  : %s", getLimb().c_str(), topic.c_str());
 
-    insertAction(ACTION_HOME,    &ArmCtrl::goHome);
-    insertAction(ACTION_RELEASE, &ArmCtrl::releaseObject);
+    // insertAction(ACTION_HOME,    &ArmCtrl::goHome);
+    // insertAction(ACTION_RELEASE, &ArmCtrl::releaseObject);
+    insertAction(MOVE,      @ArmCtrl::movePose);
 
     _n.param<bool>("internal_recovery",  internal_recovery, true);
     ROS_INFO("[%s] Internal_recovery flag set to %s", getLimb().c_str(),
@@ -71,16 +72,16 @@ void ArmCtrl::InternalThreadEntry()
     return;
 }
 
-bool ArmCtrl::serviceOtherLimbCb(baxter_collaboration::AskFeedback::Request  &req,
-                                 baxter_collaboration::AskFeedback::Response &res)
-{
-    res.success = false;
-    res.reply   = "not implemented";
-    return true;
-}
+// bool ArmCtrl::serviceOtherLimbCb(baxter_control::AskFeedback::Request  &req,
+//                                  baxter_control::AskFeedback::Response &res)
+// {
+//     res.success = false;
+//     res.reply   = "not implemented";
+//     return true;
+// }
 
-bool ArmCtrl::serviceCb(baxter_collaboration::DoAction::Request  &req,
-                        baxter_collaboration::DoAction::Response &res)
+bool ArmCtrl::serviceCb(baxter_control::DoAction::Request  &req,
+                        baxter_control::DoAction::Response &res)
 {
     string action = req.action;
     int    obj    = req.object;
@@ -187,12 +188,6 @@ string ArmCtrl::getObjectName(int id)
 bool ArmCtrl::isObjectInDB(int id)
 {
     if (object_db.find(id) != object_db.end()) return true;
-
-    // if (!insertAction)
-    // {
-    //     ROS_ERROR("[%s][object_db] Object %i is not in the database!",
-    //               getLimb().c_str(), id);
-    // }
     return false;
 }
 
@@ -302,6 +297,15 @@ string ArmCtrl::actionDBToString()
     return res;
 }
 
+bool ArmCtrl:movePose(baxter_control::DoAction::Request  &req,
+                        baxter_control::DoAction::Response &res)
+{
+    if (!moveArm(req.dir, req.dist, req.mode, false)) {
+        res.success = false;
+    }
+    return true;
+}
+
 bool ArmCtrl::moveArm(string dir, double dist, string mode, bool disable_coll_av)
 {
     Point start = getPos();
@@ -324,7 +328,7 @@ bool ArmCtrl::moveArm(string dir, double dist, string mode, bool disable_coll_av
     ros::Rate r(100);
     while(RobotInterface::ok())
     {
-        if (disable_coll_av)    suppressCollisionAv();
+        // if (disable_coll_av)    suppressCollisionAv();
 
         double t_elap = (ros::Time::now() - t_start).toSec();
 
@@ -475,11 +479,6 @@ void ArmCtrl::setState(int _state)
 
     RobotInterface::setState(_state);
 
-    // if (_state == DONE)
-    // {
-    //     setAction("");
-    //     setMarkerID(-1);
-    // }
     if (_state == DONE)
     {
         setSubState(getAction());
@@ -495,7 +494,7 @@ void ArmCtrl::setAction(string _action)
 
 void ArmCtrl::publishState()
 {
-    baxter_collaboration::ArmState msg;
+    baxter_control::ArmState msg;
 
     msg.state  = string(getState());
     msg.action = getAction();

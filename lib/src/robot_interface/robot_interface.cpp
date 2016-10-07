@@ -19,20 +19,20 @@ RobotInterface::RobotInterface(string name, string limb, bool no_robot) :
     if (no_robot) return;
 
     _joint_cmd_pub = _n.advertise<JointCommand>("/robot/limb/" + _limb + "/joint_command", 1);
-    _coll_av_pub   = _n.advertise<Empty>("/robot/limb/" + _limb + "/suppress_collision_avoidance", 1);
+    // _coll_av_pub   = _n.advertise<Empty>("/robot/limb/" + _limb + "/suppress_collision_avoidance", 1);
 
     _endpt_sub     = _n.subscribe("/robot/limb/" + _limb + "/endpoint_state",
                                     SUBSCRIBER_BUFFER, &RobotInterface::endpointCb, this);
     _ir_sub        = _n.subscribe("/robot/range/" + _limb + "_hand_range/state",
                                     SUBSCRIBER_BUFFER, &RobotInterface::IRCb, this);
-    _cuff_sub      = _n.subscribe("/robot/digital_io/" + _limb + "_lower_button/state",
-                                    SUBSCRIBER_BUFFER, &RobotInterface::cuffCb, this);
+    // _cuff_sub      = _n.subscribe("/robot/digital_io/" + _limb + "_lower_button/state",
+    //                                 SUBSCRIBER_BUFFER, &RobotInterface::cuffCb, this);
 
     _jntstate_sub  = _n.subscribe("/robot/joint_states",
                                     SUBSCRIBER_BUFFER, &RobotInterface::jointStatesCb, this);
 
-    _coll_av_sub   = _n.subscribe("/robot/limb/" + _limb + "/collision_avoidance_state",
-                                    SUBSCRIBER_BUFFER, &RobotInterface::collAvCb, this);
+    // _coll_av_sub   = _n.subscribe("/robot/limb/" + _limb + "/collision_avoidance_state",
+    //                                 SUBSCRIBER_BUFFER, &RobotInterface::collAvCb, this);
 
     _init_time = ros::Time::now();
 
@@ -110,13 +110,13 @@ void RobotInterface::jointStatesCb(const sensor_msgs::JointState& msg)
     return;
 }
 
-void RobotInterface::cuffCb(const baxter_core_msgs::DigitalIOState& msg)
-{
-    if (msg.state == baxter_core_msgs::DigitalIOState::PRESSED)
-    {
-        setState(KILLED);
-    }
-}
+// void RobotInterface::cuffCb(const baxter_core_msgs::DigitalIOState& msg)
+// {
+//     if (msg.state == baxter_core_msgs::DigitalIOState::PRESSED)
+//     {
+//         setState(KILLED);
+//     }
+// }
 
 void RobotInterface::endpointCb(const baxter_core_msgs::EndpointState& msg)
 {
@@ -129,33 +129,33 @@ void RobotInterface::endpointCb(const baxter_core_msgs::EndpointState& msg)
     tf::quaternionMsgToTF(_curr_ori, _marker_quat);
     tf::Matrix3x3 _marker_mat(_marker_quat);
 
-    filterForces();
+    // filterForces();
 }
 
-void RobotInterface::IRCb(const sensor_msgs::RangeConstPtr& msg)
-{
-    ROS_DEBUG("IRCb");
-    _curr_range = msg->range;
-    _curr_max_range = msg->max_range;
-    _curr_min_range = msg->min_range;
+// void RobotInterface::IRCb(const sensor_msgs::RangeConstPtr& msg)
+// {
+//     ROS_DEBUG("IRCb");
+//     _curr_range = msg->range;
+//     _curr_max_range = msg->max_range;
+//     _curr_min_range = msg->min_range;
 
-    if (!ir_ok)
-    {
-        ir_ok = true;
-    }
-}
+//     if (!ir_ok)
+//     {
+//         ir_ok = true;
+//     }
+// }
 
-void RobotInterface::filterForces()
-{
-    _filt_force[0] = (1 - FORCE_ALPHA) * _filt_force[0] + FORCE_ALPHA * _curr_wrench.force.x;
-    _filt_force[1] = (1 - FORCE_ALPHA) * _filt_force[1] + FORCE_ALPHA * _curr_wrench.force.y;
-    _filt_force[2] = (1 - FORCE_ALPHA) * _filt_force[2] + FORCE_ALPHA * _curr_wrench.force.z;
-}
+// void RobotInterface::filterForces()
+// {
+//     _filt_force[0] = (1 - FORCE_ALPHA) * _filt_force[0] + FORCE_ALPHA * _curr_wrench.force.x;
+//     _filt_force[1] = (1 - FORCE_ALPHA) * _filt_force[1] + FORCE_ALPHA * _curr_wrench.force.y;
+//     _filt_force[2] = (1 - FORCE_ALPHA) * _filt_force[2] + FORCE_ALPHA * _curr_wrench.force.z;
+// }
 
-void RobotInterface::hoverAboveTokens(double height)
-{
-    goToPose(0.540, 0.570, height, VERTICAL_ORI_L);
-}
+// void RobotInterface::hoverAboveTokens(double height)
+// {
+//     goToPose(0.540, 0.570, height, VERTICAL_ORI_L);
+// }
 
 bool RobotInterface::goToPoseNoCheck(double px, double py, double pz,
                                      double ox, double oy, double oz, double ow)
@@ -292,18 +292,18 @@ bool RobotInterface::computeIK(double px, double py, double pz,
     return false;
 }
 
-bool RobotInterface::hasCollided(string mode)
-{
-    float thres;
+// bool RobotInterface::hasCollided(string mode)
+// {
+//     float thres;
 
-    if     (mode == "strict") thres = 0.050;
-    else if (mode ==  "loose") thres = 0.067;
+//     if     (mode == "strict") thres = 0.050;
+//     else if (mode ==  "loose") thres = 0.067;
 
-    if (_curr_range <= _curr_max_range &&
-       _curr_range >= _curr_min_range &&
-       _curr_range <= thres) return true;
-    else return false;
-}
+//     if (_curr_range <= _curr_max_range &&
+//        _curr_range >= _curr_min_range &&
+//        _curr_range <= thres) return true;
+//     else return false;
+// }
 
 bool RobotInterface::isPoseReached(double px, double py, double pz,
                                    double ox, double oy, double oz, double ow, string mode)
@@ -420,46 +420,46 @@ void RobotInterface::setJointCommands(double s0, double s1, double e0, double e1
     joint_cmd.command.push_back(w2);
 }
 
-bool RobotInterface::detectForceInteraction()
-{
-    double f_x = abs(_curr_wrench.force.x - _filt_force[0]);
-    double f_y = abs(_curr_wrench.force.y - _filt_force[1]);
-    double f_z = abs(_curr_wrench.force.z - _filt_force[2]);
+// bool RobotInterface::detectForceInteraction()
+// {
+//     double f_x = abs(_curr_wrench.force.x - _filt_force[0]);
+//     double f_y = abs(_curr_wrench.force.y - _filt_force[1]);
+//     double f_z = abs(_curr_wrench.force.z - _filt_force[2]);
 
-    ROS_DEBUG("Interaction: %g %g %g", f_x, f_y, f_z);
+//     ROS_DEBUG("Interaction: %g %g %g", f_x, f_y, f_z);
 
-    if (f_x > force_thres || f_y > force_thres || f_z > force_thres)
-    {
-        ROS_INFO("[%s] Interaction: %g %g %g", getLimb().c_str(), f_x, f_y, f_z);
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
+//     if (f_x > force_thres || f_y > force_thres || f_z > force_thres)
+//     {
+//         ROS_INFO("[%s] Interaction: %g %g %g", getLimb().c_str(), f_x, f_y, f_z);
+//         return true;
+//     }
+//     else
+//     {
+//         return false;
+//     }
+// }
 
-bool RobotInterface::waitForForceInteraction(double _wait_time, bool disable_coll_av)
-{
-    ros::Time _init = ros::Time::now();
+// bool RobotInterface::waitForForceInteraction(double _wait_time, bool disable_coll_av)
+// {
+//     ros::Time _init = ros::Time::now();
 
-    ros::Rate r(100);
-    while (RobotInterface::ok())
-    {
-        if (disable_coll_av)          suppressCollisionAv();
-        if (detectForceInteraction())           return true;
+//     ros::Rate r(100);
+//     while (RobotInterface::ok())
+//     {
+//         if (disable_coll_av)          suppressCollisionAv();
+//         if (detectForceInteraction())           return true;
 
-        r.sleep();
+//         r.sleep();
 
-        if ((ros::Time::now()-_init).toSec() > _wait_time)
-        {
-            ROS_ERROR("No force interaction has been detected in %gs!",_wait_time);
-            return false;
-        }
-    }
+//         if ((ros::Time::now()-_init).toSec() > _wait_time)
+//         {
+//             ROS_ERROR("No force interaction has been detected in %gs!",_wait_time);
+//             return false;
+//         }
+//     }
 
-    return false;
-}
+//     return false;
+// }
 
 void RobotInterface::setState(int state)
 {
