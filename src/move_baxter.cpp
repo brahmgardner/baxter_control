@@ -2,7 +2,7 @@
 
 #include <ros/ros.h>
 #include <signal.h>
-#include "robot_interface/arm_ctrl.h"
+#include "baxter_interface/arm_ctrl.h"
 
 using namespace std;
 
@@ -26,9 +26,9 @@ int main(int argc, char ** argv)
     ROS_INFO("use_robot flag set to %s", use_robot==true?"true":"false");
 
     printf("\n");
-    Arm_Ctrl  left_arm("move_baxter","left", !use_robot);
+    ArmCtrl  left_arm("move_baxter","left", !use_robot);
     printf("\n");
-    Arm_Ctrl  right_arm("move_baxter","right", !use_robot);
+    ArmCtrl  right_arm("move_baxter","right", !use_robot);
     printf("\n");
     ROS_INFO("READY! Waiting for service messages..\n");
 
@@ -37,3 +37,4 @@ int main(int argc, char ** argv)
 
     ros::spin();
     return 0;
+}

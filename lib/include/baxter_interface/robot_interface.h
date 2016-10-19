@@ -21,9 +21,9 @@
 #include <sensor_msgs/Range.h>
 #include <std_msgs/Empty.h>
 
-#include "utils.h"
-#include "robot_interface/ros_thread.h"
-#include "robot_interface/baxter_trac_ik.h"
+#include "baxter_interface/utils.h"
+#include "baxter_interface/ros_thread.h"
+#include "baxter_interface/baxter_trac_ik.h"
 
 /**
  * @brief A ROS Thread class
@@ -33,6 +33,7 @@
 class RobotInterface : public ROSThread
 {
 private:
+    std::string    _name;
     std::string    _limb;       // Limb (either left or right)
     State         _state;       // State of the controller
     ros::Time _init_time;
@@ -65,6 +66,7 @@ private:
     // Joint States
     ros::Subscriber         _jntstate_sub;
     sensor_msgs::JointState    _seed_jnts;
+    sensor_msgs::JointState    _curr_jnts;
 
     // Mutex to protect joint state variable
     pthread_mutex_t _mutex_jnts;
@@ -127,6 +129,17 @@ protected:
     bool isPositionReached(double px, double py, double pz, std::string mode = "loose");
 
     /*
+     * Checks if the arm has reached its intended joint configuration by comparing
+     * the requested and the current joint configurations
+     *
+     * @param  j     requested joint configuration
+     * @param  mode  (strict/loose) the desired level of precision
+     * @return       true/false if success/failure
+     */
+    bool isConfigurationReached(baxter_core_msgs::JointCommand joint_cmd, std::string mode = "loose");
+
+
+    /*
      * Checks if the arm has reached its intended orientation by comparing
      * the requested and the current orientations
      *
@@ -145,9 +158,9 @@ protected:
      * @param     array of joint angles solution
      * @return    true/false if success/failure
      */
-    bool callIKService(double px, double py, double pz,
-                       double ox, double oy, double oz, double ow,
-                       std::vector<double>& joint_angles);
+    bool computeIK(double px, double py, double pz,
+                   double ox, double oy, double oz, double ow,
+                   std::vector<double>& joint_angles);
 
     /*
      * Moves arm to the requested pose. This differs from RobotInterface::goToPose because it
@@ -181,11 +194,27 @@ protected:
     void setJointNames(baxter_core_msgs::JointCommand& joint_cmd);
 
     /*
+     * Sets the joint commands of a JointCommand
+     *
+     * @param        s0 First  shoulder joint
+     * @param        s1 Second shoulder joint
+     * @param        e0 First  elbow    joint
+     * @param        e1 Second elbow    joint
+     * @param        w0 First  wrist    joint
+     * @param        w1 Second wrist    joint
+     * @param        w2 Third  wrist    joint
+     * @param joint_cmd the joint command
+     */
+    void setJointCommands(double s0, double s1, double e0, double e1,
+                                     double w0, double w1, double w2,
+                          baxter_core_msgs::JointCommand& joint_cmd);
+
+    /*
      * Detects if the force overcame a set threshold in either one of its three axis
      *
      * @return true/false if the force overcame the threshold
      */
-    // bool detectForceInteraction();
+    bool detectForceInteraction();
 
     /*
      * Waits for a force interaction to occur.
@@ -193,7 +222,7 @@ protected:
      * @return true when the force interaction occurred
      * @return false if no force interaction occurred after 20s
      */
-    // bool waitForForceInteraction(double _wait_time = 20.0, bool disable_coll_av = false);
+    bool waitForForceInteraction(double _wait_time = 20.0, bool disable_coll_av = false);
 
     /*
      * Callback function that sets the current pose to the pose received from
@@ -208,7 +237,7 @@ protected:
      *
      * @param msg the topic message
      */
-    // void cuffCb(const baxter_core_msgs::DigitalIOState& msg);
+    void cuffCb(const baxter_core_msgs::DigitalIOState& msg);
 
     /**
      * Callback for the joint states. Used to seed the
@@ -226,20 +255,28 @@ protected:
      *
      * @param msg the topic message
      */
-    // void collAvCb(const baxter_core_msgs::CollisionAvoidanceState& msg);
+    void collAvCb(const baxter_core_msgs::CollisionAvoidanceState& msg);
 
+    /*
+     * Infrared sensor callback function that sets the current range to the range received
+     * from the left hand range state topic
+     *
+     * @param      The message
+     * @return     N/A
+     */
+    void IRCb(const sensor_msgs::RangeConstPtr& msg);
     /*
      * Filters the forces with a very simple low pass filter
      */
-    // void filterForces();
+    void filterForces();
 
-    
-    //  * hover arm above tokens
-    //  *
-    //  * @param      double indicating requested height of arm (z-axis)
-    //  * return     N/A
-     
-    // void hoverAboveTokens(double height);
+
+     // * hover arm above tokens
+     // *
+     // * @param      double indicating requested height of arm (z-axis)
+     // * return     N/A
+
+    void hoverAboveTokens(double height);
 
     /**
      * @brief Publishes the desired joint configuration
@@ -259,13 +296,14 @@ protected:
     void suppressCollisionAv();
 
 public:
-    RobotInterface(std::string limb, bool no_robot = false);
+    RobotInterface(std::string name, std::string limb, bool no_robot = false);
 
     virtual ~RobotInterface();
 
     /*
      * Self-explaining "setters"
      */
+    void setName(std::string name) { _name = name; };
     void setState(int state);
 
     /*
@@ -308,7 +346,7 @@ protected:
     pthread_mutex_t _mutex_img;
 
 public:
-    ROSThreadImage(std::string limb);
+    ROSThreadImage(std::string name, std::string limb);
     ~ROSThreadImage();
 
     /*

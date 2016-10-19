@@ -1,4 +1,4 @@
-#include "robot_interface/ros_thread.h"
+#include "baxter_interface/ros_thread.h"
 
 #include <tf/transform_datatypes.h>
 

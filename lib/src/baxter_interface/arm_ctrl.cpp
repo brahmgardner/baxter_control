@@ -1,4 +1,4 @@
-#include "robot_interface/arm_ctrl.h"
+#include "baxter_interface/arm_ctrl.h"
 #include <pthread.h>
 
 using namespace std;
@@ -6,8 +6,8 @@ using namespace geometry_msgs;
 using namespace baxter_core_msgs;
 
 ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
-                 RobotInterface(_name,_limb, _no_robot),
-                 object_id(-1), action(""), sub_state("")
+                 RobotInterface(_name, _limb, _no_robot),
+                 action(""), sub_state("")
 {
     std::string topic = "/"+getName()+"/state_"+_limb;
     state_pub = _n.advertise<baxter_control::ArmState>(topic,1);
@@ -20,12 +20,12 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
     ROS_INFO("[%s] Created service server with name  : %s", getLimb().c_str(), topic.c_str());
 
     topic = "/"+getName()+"/service_"+_limb+"_to_"+other_limb;
-    service_other_limb = _n.advertiseService(topic, &ArmCtrl::serviceOtherLimbCb,this);
+    // service_other_limb = _n.advertiseService(topic, &ArmCtrl::serviceOtherLimbCb,this);
     ROS_INFO("[%s] Created service server with name  : %s", getLimb().c_str(), topic.c_str());
 
     // insertAction(ACTION_HOME,    &ArmCtrl::goHome);
     // insertAction(ACTION_RELEASE, &ArmCtrl::releaseObject);
-    insertAction(MOVE,      @ArmCtrl::movePose);
+    insertAction(MOVE,      &ArmCtrl::notImplemented);
 
     _n.param<bool>("internal_recovery",  internal_recovery, true);
     ROS_INFO("[%s] Internal_recovery flag set to %s", getLimb().c_str(),
@@ -84,7 +84,7 @@ bool ArmCtrl::serviceCb(baxter_control::DoAction::Request  &req,
                         baxter_control::DoAction::Response &res)
 {
     string action = req.action;
-    int    obj    = req.object;
+    int    obj    = req.obj;
 
     ROS_INFO("[%s] Service request received. Action: %s object: %i", getLimb().c_str(),
                                                                    action.c_str(), obj);
@@ -297,7 +297,7 @@ string ArmCtrl::actionDBToString()
     return res;
 }
 
-bool ArmCtrl:movePose(baxter_control::DoAction::Request  &req,
+bool ArmCtrl::movePose(baxter_control::DoAction::Request  &req,
                         baxter_control::DoAction::Response &res)
 {
     if (!moveArm(req.dir, req.dist, req.mode, false)) {
@@ -421,32 +421,32 @@ bool ArmCtrl::moveArm(string dir, double dist, string mode, bool disable_coll_av
 //     else return false;
 // }
 
-// bool ArmCtrl::homePoseStrict(bool disable_coll_av)
-// {
-//     ROS_INFO("[%s] Going to home position strict..", getLimb().c_str());
+bool ArmCtrl::homePoseStrict(bool disable_coll_av)
+{
+    ROS_INFO("[%s] Going to home position strict..", getLimb().c_str());
 
-//     ros::Rate r(100);
-//     while(ros::ok())
-//     {
-//         if (disable_coll_av)    suppressCollisionAv();
+    ros::Rate r(100);
+    while(ros::ok())
+    {
+        if (disable_coll_av)    suppressCollisionAv();
 
-//         JointCommand joint_cmd;
-//         joint_cmd.mode = JointCommand::POSITION_MODE;
-//         setJointNames(joint_cmd);
+        JointCommand joint_cmd;
+        joint_cmd.mode = JointCommand::POSITION_MODE;
+        setJointNames(joint_cmd);
 
-//         joint_cmd.command = home_conf.command;
+        joint_cmd.command = home_conf.command;
 
-//         publish_joint_cmd(joint_cmd);
+        publish_joint_cmd(joint_cmd);
 
-//         r.sleep();
+        r.sleep();
 
-//         if(isConfigurationReached(joint_cmd))
-//         {
-//             return true;
-//         }
-//     }
-//     ROS_INFO("[%s] Done", getLimb().c_str());
-// }
+        if(isConfigurationReached(joint_cmd))
+        {
+            return true;
+        }
+    }
+    ROS_INFO("[%s] Done", getLimb().c_str());
+}
 
 // void ArmCtrl::setHomeConf(double s0, double s1, double e0, double e1,
 //                                      double w0, double w1, double w2)
@@ -457,7 +457,6 @@ bool ArmCtrl::moveArm(string dir, double dist, string mode, bool disable_coll_av
 bool ArmCtrl::goHome()
 {
     bool res = homePoseStrict();
-    releaseObject();
     return res;
 }
 
@@ -498,7 +497,6 @@ void ArmCtrl::publishState()
 
     msg.state  = string(getState());
     msg.action = getAction();
-    msg.object = getObjectName(getObjectID());
 
     state_pub.publish(msg);
 }
