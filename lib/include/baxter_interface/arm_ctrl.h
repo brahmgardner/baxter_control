@@ -20,6 +20,9 @@ private:
     std::string  sub_state;
 
     std::string     action;
+    std::string        dir;
+    std::string       mode;
+    float             dist;
     int          marker_id;
     int          object_id;
 
@@ -124,8 +127,7 @@ protected:
     bool moveArm(std::string dir, double dist, std::string mode = "loose",
                                              bool disable_coll_av = false);
 
-    bool movePose(baxter_control::DoAction::Request  &req,
-                   baxter_control::DoAction::Response &res);
+    bool movePose();
 
     /**
      * Placeholder for an action that has not been implemented (yet)
@@ -287,8 +289,8 @@ public:
      * @param  res the action response (res.success either true or false)
      * @return     true always :)
      */
-    // virtual bool serviceOtherLimbCb(baxter_control::AskFeedback::Request  &req,
-    //                                 baxter_control::AskFeedback::Response &res);
+    virtual bool serviceOtherLimbCb(baxter_control::DoAction::Request  &req,
+                                    baxter_control::DoAction::Response &res);
 
     void publishState();
 
@@ -298,6 +300,9 @@ public:
     void setMarkerID(int _id)            { marker_id =     _id; };
     virtual void setObjectID(int _obj)   { object_id =    _obj; };
     void setAction(std::string _action);
+    void setDir(std::string _dir);
+    void setMode(std::string _mode);
+    void setDist(float dist);
 
     void setState(int _state);
 
@@ -305,6 +310,9 @@ public:
     std::string getName()     { return      name; };
     std::string getSubState() { return sub_state; };
     std::string getAction()   { return    action; };
+    std::string getDir()      { return       dir; };
+    std::string getMode()     { return      mode; };
+    float       getDist()     { return      dist; };
     int         getMarkerID() { return marker_id; };
     int         getObjectID() { return object_id; };
     std::string getObjName();

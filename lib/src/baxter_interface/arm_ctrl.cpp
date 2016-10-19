@@ -20,16 +20,17 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
     ROS_INFO("[%s] Created service server with name  : %s", getLimb().c_str(), topic.c_str());
 
     topic = "/"+getName()+"/service_"+_limb+"_to_"+other_limb;
-    // service_other_limb = _n.advertiseService(topic, &ArmCtrl::serviceOtherLimbCb,this);
+    service_other_limb = _n.advertiseService(topic, &ArmCtrl::serviceOtherLimbCb,this);
     ROS_INFO("[%s] Created service server with name  : %s", getLimb().c_str(), topic.c_str());
 
     // insertAction(ACTION_HOME,    &ArmCtrl::goHome);
     // insertAction(ACTION_RELEASE, &ArmCtrl::releaseObject);
-    insertAction(MOVE,      &ArmCtrl::notImplemented);
+    insertAction(MOVE,      &ArmCtrl::movePose);
 
     _n.param<bool>("internal_recovery",  internal_recovery, true);
     ROS_INFO("[%s] Internal_recovery flag set to %s", getLimb().c_str(),
                                 internal_recovery==true?"true":"false");
+
 }
 
 void ArmCtrl::InternalThreadEntry()
@@ -72,18 +73,21 @@ void ArmCtrl::InternalThreadEntry()
     return;
 }
 
-// bool ArmCtrl::serviceOtherLimbCb(baxter_control::AskFeedback::Request  &req,
-//                                  baxter_control::AskFeedback::Response &res)
-// {
-//     res.success = false;
-//     res.reply   = "not implemented";
-//     return true;
-// }
+bool ArmCtrl::serviceOtherLimbCb(baxter_control::DoAction::Request  &req,
+                                 baxter_control::DoAction::Response &res)
+{
+    res.success = false;
+    res.response   = "not implemented";
+    return true;
+}
 
 bool ArmCtrl::serviceCb(baxter_control::DoAction::Request  &req,
                         baxter_control::DoAction::Response &res)
 {
-    string action = req.action;
+    std::string action = req.action;
+    std::string dir    = req.dir;
+    std::string mode   = req.mode;
+    float dist    = req.dist;
     int    obj    = req.obj;
 
     ROS_INFO("[%s] Service request received. Action: %s object: %i", getLimb().c_str(),
@@ -108,6 +112,9 @@ bool ArmCtrl::serviceCb(baxter_control::DoAction::Request  &req,
 
     res.success = false;
 
+    setDir(dir);
+    setMode(mode);
+    setDist(dist);
     setAction(action);
     setObjectID(obj);
 
@@ -297,11 +304,13 @@ string ArmCtrl::actionDBToString()
     return res;
 }
 
-bool ArmCtrl::movePose(baxter_control::DoAction::Request  &req,
-                        baxter_control::DoAction::Response &res)
+bool ArmCtrl::movePose()
 {
-    if (!moveArm(req.dir, req.dist, req.mode, false)) {
-        res.success = false;
+    float dist = getDist();
+    std::string dir = getDir();
+    std::string mode = getMode();
+    if (!moveArm(dir, dist, mode, false)) {
+        return false;
     }
     return true;
 }
@@ -488,6 +497,24 @@ void ArmCtrl::setState(int _state)
 void ArmCtrl::setAction(string _action)
 {
     action = _action;
+    publishState();
+}
+
+void ArmCtrl::setDir(string _dir)
+{
+    dir = _dir;
+    publishState();
+}
+
+void ArmCtrl::setDist(float _dist)
+{
+    dist = _dist;
+    publishState();
+}
+
+void ArmCtrl::setMode(string _mode)
+{
+    mode = _mode;
     publishState();
 }
 
