@@ -16,7 +16,8 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
     std::string other_limb = getLimb() == "right" ? "left" : "right";
 
     topic = "/"+getName()+"/service_"+_limb;
-    service = _n.advertiseService(topic, &ArmCtrl::serviceCb, this);
+    control_topic = _n.subscribe(topic, 1, &ArmCtrl::moveArmCb, this);
+    // service = _n.advertiseService(topic, &ArmCtrl::serviceCb, this);
     ROS_INFO("[%s] Created service server with name  : %s", getLimb().c_str(), topic.c_str());
 
     topic = "/"+getName()+"/service_"+_limb+"_to_"+other_limb;
@@ -73,24 +74,15 @@ void ArmCtrl::InternalThreadEntry()
     return;
 }
 
-bool ArmCtrl::serviceOtherLimbCb(baxter_control::DoAction::Request  &req,
-                                 baxter_control::DoAction::Response &res)
+void RobotInterface::moveArmCb(const ArmPos& msg)
 {
-    res.success = false;
-    res.response   = "not implemented";
-    return true;
-}
+    std::string action = msg.action;
+    std::string dir    = msg.dir;
+    std::string mode   = msg.mode;
+    float dist    = msg.dist;
+    int    obj    = msg.obj;
 
-bool ArmCtrl::serviceCb(baxter_control::DoAction::Request  &req,
-                        baxter_control::DoAction::Response &res)
-{
-    std::string action = req.action;
-    std::string dir    = req.dir;
-    std::string mode   = req.mode;
-    float dist    = req.dist;
-    int    obj    = req.obj;
-
-    ROS_INFO("[%s] Service request received. Action: %s object: %i", getLimb().c_str(),
+    ROS_INFO("[%s] Message request received. Action: %s object: %i", getLimb().c_str(),
                                                                    action.c_str(), obj);
 
     if (action == PROT_ACTION_LIST)
@@ -106,11 +98,11 @@ bool ArmCtrl::serviceCb(baxter_control::DoAction::Request  &req,
         setState(WORKING);
         ros::Duration(2.0).sleep();
         setState(DONE);
-        res.success = true;
+        // res.success = true;
         return true;
     }
 
-    res.success = false;
+    // res.success = false;
 
     setDir(dir);
     setMode(mode);
@@ -141,17 +133,97 @@ bool ArmCtrl::serviceCb(baxter_control::DoAction::Request  &req,
         r.sleep();
     }
 
-    if ( int(getState()) == START   ||
-         int(getState()) == DONE    ||
-         int(getState()) == PICK_UP   )
-    {
-        res.success = true;
-    }
+    // if ( int(getState()) == START   ||
+    //      int(getState()) == DONE    ||
+    //      int(getState()) == PICK_UP   )
+    // {
+    //     res.success = true;
+    // }
 
     ROS_INFO("[%s] Service reply with success: %s\n", getLimb().c_str(),
                                             res.success?"true":"false");
     return true;
 }
+
+bool ArmCtrl::serviceOtherLimbCb(baxter_control::DoAction::Request  &req,
+                                 baxter_control::DoAction::Response &res)
+{
+    res.success = false;
+    res.response   = "not implemented";
+    return true;
+}
+
+// bool ArmCtrl::serviceCb(baxter_control::DoAction::Request  &req,
+//                         baxter_control::DoAction::Response &res)
+// {
+//     std::string action = req.action;
+//     std::string dir    = req.dir;
+//     std::string mode   = req.mode;
+//     float dist    = req.dist;
+//     int    obj    = req.obj;
+
+//     ROS_INFO("[%s] Service request received. Action: %s object: %i", getLimb().c_str(),
+//                                                                    action.c_str(), obj);
+
+//     if (action == PROT_ACTION_LIST)
+//     {
+//         printActionDB();
+//         res.success  = true;
+//         res.response = actionDBToString();
+//         return true;
+//     }
+
+//     if (is_no_robot())
+//     {
+//         setState(WORKING);
+//         ros::Duration(2.0).sleep();
+//         setState(DONE);
+//         res.success = true;
+//         return true;
+//     }
+
+//     res.success = false;
+
+//     setDir(dir);
+//     setMode(mode);
+//     setDist(dist);
+//     setAction(action);
+//     setObjectID(obj);
+
+//     startInternalThread();
+//     ros::Duration(0.5).sleep();
+
+//     ros::Rate r(100);
+//     while( ros::ok() && ( int(getState()) != START   &&
+//                           int(getState()) != ERROR   &&
+//                           int(getState()) != DONE    &&
+//                           int(getState()) != PICK_UP   ))
+//     {
+//         if (ros::isShuttingDown())
+//         {
+//             setState(KILLED);
+//             return true;
+//         }
+
+//         if (getState()==KILLED)
+//         {
+//             recoverFromError();
+//         }
+
+//         r.sleep();
+//     }
+
+//     if ( int(getState()) == START   ||
+//          int(getState()) == DONE    ||
+//          int(getState()) == PICK_UP   )
+//     {
+//         res.success = true;
+//     }
+
+//     ROS_INFO("[%s] Service reply with success: %s\n", getLimb().c_str(),
+//                                             res.success?"true":"false");
+//     return true;
+// }
 
 bool ArmCtrl::notImplemented()
 {

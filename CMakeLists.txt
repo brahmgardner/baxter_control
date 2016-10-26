@@ -52,6 +52,7 @@ find_package(OpenCV 2.4 REQUIRED)
 add_message_files(
   FILES
   ArmState.msg
+  ArmPos.msg
 )
 
 ## Generate services in the 'srv' folder
