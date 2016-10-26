@@ -7,6 +7,7 @@
 
 #include "baxter_control/DoAction.h"
 #include "baxter_control/ArmState.h"
+#include "baxter_control/ArmPos.h"
 
 #define HAND_OVER_START  "handover_start"
 #define HAND_OVER_READY  "handover_ready"
@@ -34,6 +35,8 @@ private:
     ros::ServiceServer service_other_limb;
 
     ros::Publisher     state_pub;
+
+    ros::Subscriber    control_topic;
 
     baxter_core_msgs::JointCommand home_conf;
 
@@ -291,6 +294,8 @@ public:
      */
     virtual bool serviceOtherLimbCb(baxter_control::DoAction::Request  &req,
                                     baxter_control::DoAction::Response &res);
+
+    void moveArmCb(const baxter_control::ArmPos::ConstPtr& msg);
 
     void publishState();
 

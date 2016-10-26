@@ -1,4 +1,5 @@
 #include "baxter_interface/arm_ctrl.h"
+#include "baxter_control/ArmPos.h"
 #include <pthread.h>
 
 using namespace std;
@@ -74,13 +75,13 @@ void ArmCtrl::InternalThreadEntry()
     return;
 }
 
-void RobotInterface::moveArmCb(const ArmPos& msg)
+void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
 {
-    std::string action = msg.action;
-    std::string dir    = msg.dir;
-    std::string mode   = msg.mode;
-    float dist    = msg.dist;
-    int    obj    = msg.obj;
+    std::string action = msg->action;
+    std::string dir    = msg->dir;
+    std::string mode   = msg->mode;
+    float dist    = msg->dist;
+    int    obj    = msg->obj;
 
     ROS_INFO("[%s] Message request received. Action: %s object: %i", getLimb().c_str(),
                                                                    action.c_str(), obj);
@@ -88,9 +89,10 @@ void RobotInterface::moveArmCb(const ArmPos& msg)
     if (action == PROT_ACTION_LIST)
     {
         printActionDB();
-        res.success  = true;
-        res.response = actionDBToString();
-        return true;
+        // res.success  = true;
+        // res.response = actionDBToString();
+        // return true;
+        return;
     }
 
     if (is_no_robot())
@@ -99,7 +101,8 @@ void RobotInterface::moveArmCb(const ArmPos& msg)
         ros::Duration(2.0).sleep();
         setState(DONE);
         // res.success = true;
-        return true;
+        // return true;
+        return;
     }
 
     // res.success = false;
@@ -122,7 +125,8 @@ void RobotInterface::moveArmCb(const ArmPos& msg)
         if (ros::isShuttingDown())
         {
             setState(KILLED);
-            return true;
+            // return true;
+            return;
         }
 
         if (getState()==KILLED)
@@ -140,9 +144,10 @@ void RobotInterface::moveArmCb(const ArmPos& msg)
     //     res.success = true;
     // }
 
-    ROS_INFO("[%s] Service reply with success: %s\n", getLimb().c_str(),
-                                            res.success?"true":"false");
-    return true;
+    // ROS_INFO("[%s] Service reply with success: %s\n", getLimb().c_str(),
+    //                                         res.success?"true":"false");
+    // return true;
+    return;
 }
 
 bool ArmCtrl::serviceOtherLimbCb(baxter_control::DoAction::Request  &req,

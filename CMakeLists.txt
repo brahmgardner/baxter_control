@@ -69,7 +69,7 @@ add_service_files(FILES
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(DEPENDENCIES
-                  # std_msgs
+                  std_msgs
 )
 
 ################################################
@@ -104,7 +104,7 @@ generate_messages(DEPENDENCIES
 catkin_package(
     INCLUDE_DIRS lib/include
     LIBRARIES baxter_interface
-    CATKIN_DEPENDS trac_ik_lib message_runtime
+    CATKIN_DEPENDS trac_ik_lib message_runtime std_msgs
     # DEPENDS system_lib
 )
 
