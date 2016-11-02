@@ -100,6 +100,9 @@ protected:
      */
     bool homePoseStrict(bool disable_coll_av = false);
 
+    void setHomeConf(double s0, double s1, double e0, double e1,
+                                     double w0, double w1, double w2);
+
     /**
      * Hovers above the table with a specific joint configuration. This has
      * been introduced in order to force the arms to go to the home configuration

@@ -361,8 +361,10 @@ bool RobotInterface::isConfigurationReached(baxter_core_msgs::JointCommand joint
     {
         return false;
     }
-
-    ROS_DEBUG("[%s] Checking configuration: Current %g %g %g %g %g %g %g\tDesired %g %g %g %g %g %g %g",
+    ROS_INFO("[%s]", getLimb().c_str());
+    ROS_INFO("[%g]", _curr_jnts.position[0]);
+    ROS_INFO("[%g]", joint_cmd.command[0]);
+    ROS_INFO("[%s] Checking configuration: Current %g %g %g %g %g %g %g\tDesired %g %g %g %g %g %g %g",
                                                                                       getLimb().c_str(),
          _curr_jnts.position[0], _curr_jnts.position[1], _curr_jnts.position[2], _curr_jnts.position[3],
                                  _curr_jnts.position[4], _curr_jnts.position[5], _curr_jnts.position[6],

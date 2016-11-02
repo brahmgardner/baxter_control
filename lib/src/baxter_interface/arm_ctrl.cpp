@@ -10,6 +10,8 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
                  RobotInterface(_name, _limb, _no_robot),
                  action(""), sub_state("")
 {
+    setHomeConf( 0.0717, -1.0009, 1.1083, 1.5520,
+                         -0.5235, 1.3468, 0.4464);
     std::string topic = "/"+getName()+"/state_"+_limb;
     state_pub = _n.advertise<baxter_control::ArmState>(topic,1);
     ROS_INFO("[%s] Created state publisher with name : %s", getLimb().c_str(), topic.c_str());
@@ -89,9 +91,6 @@ void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
     if (action == PROT_ACTION_LIST)
     {
         printActionDB();
-        // res.success  = true;
-        // res.response = actionDBToString();
-        // return true;
         return;
     }
 
@@ -100,8 +99,6 @@ void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
         setState(WORKING);
         ros::Duration(2.0).sleep();
         setState(DONE);
-        // res.success = true;
-        // return true;
         return;
     }
 
@@ -125,7 +122,6 @@ void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
         if (ros::isShuttingDown())
         {
             setState(KILLED);
-            // return true;
             return;
         }
 
@@ -136,17 +132,6 @@ void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
 
         r.sleep();
     }
-
-    // if ( int(getState()) == START   ||
-    //      int(getState()) == DONE    ||
-    //      int(getState()) == PICK_UP   )
-    // {
-    //     res.success = true;
-    // }
-
-    // ROS_INFO("[%s] Service reply with success: %s\n", getLimb().c_str(),
-    //                                         res.success?"true":"false");
-    // return true;
     return;
 }
 
@@ -157,78 +142,6 @@ bool ArmCtrl::serviceOtherLimbCb(baxter_control::DoAction::Request  &req,
     res.response   = "not implemented";
     return true;
 }
-
-// bool ArmCtrl::serviceCb(baxter_control::DoAction::Request  &req,
-//                         baxter_control::DoAction::Response &res)
-// {
-//     std::string action = req.action;
-//     std::string dir    = req.dir;
-//     std::string mode   = req.mode;
-//     float dist    = req.dist;
-//     int    obj    = req.obj;
-
-//     ROS_INFO("[%s] Service request received. Action: %s object: %i", getLimb().c_str(),
-//                                                                    action.c_str(), obj);
-
-//     if (action == PROT_ACTION_LIST)
-//     {
-//         printActionDB();
-//         res.success  = true;
-//         res.response = actionDBToString();
-//         return true;
-//     }
-
-//     if (is_no_robot())
-//     {
-//         setState(WORKING);
-//         ros::Duration(2.0).sleep();
-//         setState(DONE);
-//         res.success = true;
-//         return true;
-//     }
-
-//     res.success = false;
-
-//     setDir(dir);
-//     setMode(mode);
-//     setDist(dist);
-//     setAction(action);
-//     setObjectID(obj);
-
-//     startInternalThread();
-//     ros::Duration(0.5).sleep();
-
-//     ros::Rate r(100);
-//     while( ros::ok() && ( int(getState()) != START   &&
-//                           int(getState()) != ERROR   &&
-//                           int(getState()) != DONE    &&
-//                           int(getState()) != PICK_UP   ))
-//     {
-//         if (ros::isShuttingDown())
-//         {
-//             setState(KILLED);
-//             return true;
-//         }
-
-//         if (getState()==KILLED)
-//         {
-//             recoverFromError();
-//         }
-
-//         r.sleep();
-//     }
-
-//     if ( int(getState()) == START   ||
-//          int(getState()) == DONE    ||
-//          int(getState()) == PICK_UP   )
-//     {
-//         res.success = true;
-//     }
-
-//     ROS_INFO("[%s] Service reply with success: %s\n", getLimb().c_str(),
-//                                             res.success?"true":"false");
-//     return true;
-// }
 
 bool ArmCtrl::notImplemented()
 {
@@ -386,7 +299,7 @@ bool ArmCtrl::movePose()
     float dist = getDist();
     std::string dir = getDir();
     std::string mode = getMode();
-    if (!moveArm(dir, dist, mode, false)) {
+    if (!moveArm(dir, dist, mode, true)) {
         return false;
     }
     return true;
@@ -414,7 +327,7 @@ bool ArmCtrl::moveArm(string dir, double dist, string mode, bool disable_coll_av
     ros::Rate r(100);
     while(RobotInterface::ok())
     {
-        // if (disable_coll_av)    suppressCollisionAv();
+        if (disable_coll_av)    suppressCollisionAv();
 
         double t_elap = (ros::Time::now() - t_start).toSec();
 
@@ -515,7 +428,6 @@ bool ArmCtrl::homePoseStrict(bool disable_coll_av)
     while(ros::ok())
     {
         if (disable_coll_av)    suppressCollisionAv();
-
         JointCommand joint_cmd;
         joint_cmd.mode = JointCommand::POSITION_MODE;
         setJointNames(joint_cmd);
@@ -530,15 +442,16 @@ bool ArmCtrl::homePoseStrict(bool disable_coll_av)
         {
             return true;
         }
+        ROS_DEBUG("Debug");
     }
     ROS_INFO("[%s] Done", getLimb().c_str());
 }
 
-// void ArmCtrl::setHomeConf(double s0, double s1, double e0, double e1,
-//                                      double w0, double w1, double w2)
-// {
-//     setJointCommands( s0, s1, e0, e1, w0, w1, w2, home_conf);
-// }
+void ArmCtrl::setHomeConf(double s0, double s1, double e0, double e1,
+                                     double w0, double w1, double w2)
+{
+    setJointCommands( s0, s1, e0, e1, w0, w1, w2, home_conf);
+}
 
 bool ArmCtrl::goHome()
 {

@@ -30,7 +30,7 @@ int main(int argc, char ** argv)
     printf("\n");
     ArmCtrl  right_arm("move_baxter","right", !use_robot);
     printf("\n");
-    ROS_INFO("READY! Waiting for service messages..\n");
+    ROS_INFO("READY! Waiting for messages..\n");
 
     //Override the default ros sigint handler.
     signal(SIGINT, mySigintHandler);
