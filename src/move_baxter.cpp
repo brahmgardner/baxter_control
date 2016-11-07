@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include <ros/ros.h>
+#include <ros/callback_queue.h>
 #include <signal.h>
 #include "baxter_interface/arm_ctrl.h"
 
@@ -26,7 +27,7 @@ int main(int argc, char ** argv)
     ROS_INFO("use_robot flag set to %s", use_robot==true?"true":"false");
 
     printf("\n");
-    ArmCtrl  left_arm("move_baxter","left", !use_robot);
+    // ArmCtrl  left_arm("move_baxter","left", !use_robot);
     printf("\n");
     ArmCtrl  right_arm("move_baxter","right", !use_robot);
     printf("\n");

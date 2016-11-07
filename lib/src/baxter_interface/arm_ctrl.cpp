@@ -19,8 +19,7 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
     std::string other_limb = getLimb() == "right" ? "left" : "right";
 
     topic = "/"+getName()+"/service_"+_limb;
-    control_topic = _n.subscribe(topic, 1, &ArmCtrl::moveArmCb, this);
-    // service = _n.advertiseService(topic, &ArmCtrl::serviceCb, this);
+    control_topic = _n.subscribe(topic, 1, &ArmCtrl::updateDesiredPoseCb, this);
     ROS_INFO("[%s] Created service server with name  : %s", getLimb().c_str(), topic.c_str());
 
     topic = "/"+getName()+"/service_"+_limb+"_to_"+other_limb;
@@ -34,45 +33,75 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
     _n.param<bool>("internal_recovery",  internal_recovery, true);
     ROS_INFO("[%s] Internal_recovery flag set to %s", getLimb().c_str(),
                                 internal_recovery==true?"true":"false");
+    ROS_INFO("Starting thread to capture direction data.");
+    startInternalThread();
 
 }
 
+// void ArmCtrl::InternalThreadEntry()
+// {
+//     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
+//     _n.param<bool>("internal_recovery",  internal_recovery, true);
+
+//     std::string a =     getAction();
+//     int         s = int(getState());
+
+//     ROS_INFO("action called is: [%s]", a.c_str());
+
+//     setState(WORKING);
+
+//     if (a == ACTION_HOME || a == ACTION_RELEASE)
+//     {
+//         if (callAction(a))   setState(DONE);
+//     }
+//     else if (s == START || s == ERROR ||
+//              s == DONE  || s == KILLED )
+//     {
+//         if (doAction(s, a))   setState(DONE);
+//         else                  setState(ERROR);
+//     }
+//     else
+//     {
+//         ROS_ERROR("[%s] Invalid Action %s in state %i", getLimb().c_str(), a.c_str(), s);
+//     }
+
+//     if (getState()==WORKING)
+//     {
+//         setState(ERROR);
+//     }
+
+//     if (getState()==ERROR)
+//     {
+//         ROS_ERROR("[%s] Action %s not successful! State %s %s", getLimb().c_str(), a.c_str(),
+//                                           string(getState()).c_str(), getSubState().c_str());
+//     }
+
+//     closeInternalThread();
+//     return;
+// }
+
 void ArmCtrl::InternalThreadEntry()
 {
+    setInitDesiredPose();
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
     _n.param<bool>("internal_recovery",  internal_recovery, true);
-
-    std::string a =     getAction();
-    int         s = int(getState());
-
-    setState(WORKING);
-
-    if (a == ACTION_HOME || a == ACTION_RELEASE)
-    {
-        if (callAction(a))   setState(DONE);
+    geometry_msgs::Point desiredPose;
+    geometry_msgs::Point currPose;
+    geometry_msgs::Quaternion ori;
+    vector<double> joint_angles;
+    ros::Rate r(100);
+    while (true) {
+        desiredPose = getDesiredPos();
+        currPose = getPos();
+        ori = getOri();
+        ROS_INFO("Current Position is %f %f %f", currPose.x, currPose.y, currPose.z);
+        ROS_INFO("Desired Position is %f %f %f", desiredPose.x, desiredPose.y, desiredPose.z);
+        if(!isPositionReached(desiredPose.x, desiredPose.y, desiredPose.z)) {
+            computeIK(currPose.x, currPose.y, currPose.z, ori.x, ori.y, ori.z, ori.w, joint_angles);
+            goToPoseNoCheck(joint_angles);
+        }
+        r.sleep();
     }
-    else if (s == START || s == ERROR ||
-             s == DONE  || s == KILLED )
-    {
-        if (doAction(s, a))   setState(DONE);
-        else                  setState(ERROR);
-    }
-    else
-    {
-        ROS_ERROR("[%s] Invalid Action %s in state %i", getLimb().c_str(), a.c_str(), s);
-    }
-
-    if (getState()==WORKING)
-    {
-        setState(ERROR);
-    }
-
-    if (getState()==ERROR)
-    {
-        ROS_ERROR("[%s] Action %s not successful! State %s %s", getLimb().c_str(), a.c_str(),
-                                          string(getState()).c_str(), getSubState().c_str());
-    }
-
     closeInternalThread();
     return;
 }
@@ -101,8 +130,6 @@ void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
         setState(DONE);
         return;
     }
-
-    // res.success = false;
 
     setDir(dir);
     setMode(mode);
@@ -133,6 +160,37 @@ void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
         r.sleep();
     }
     return;
+}
+
+void ArmCtrl::updateDesiredPoseCb(const baxter_control::ArmPos::ConstPtr& msg)
+{
+    std::string action = msg->action;
+    std::string dir    = msg->dir;
+    std::string mode   = msg->mode;
+    float dist    = msg->dist;
+    int    obj    = msg->obj;
+
+    setDir(dir);
+    setMode(mode);
+    setDist(dist);
+    setAction(action);
+    setObjectID(obj);
+
+    if      (dir == "backward") _desired_pos.x -= dist;
+    else if (dir == "forward")  _desired_pos.x += dist;
+    else if (dir == "right")    _desired_pos.y -= dist;
+    else if (dir == "left")     _desired_pos.y += dist;
+    else if (dir == "down")     _desired_pos.z -= dist;
+    else if (dir == "up")       _desired_pos.z += dist;
+}
+
+void ArmCtrl::setInitDesiredPose() {
+    ros::Duration(0.5).sleep();
+    geometry_msgs::Point point = getPos();
+    ROS_INFO("Current Position is %f %f %f", point.x, point.y, point.z);
+    _desired_pos.x = point.x;
+    _desired_pos.y = point.y;
+    _desired_pos.z = point.z;
 }
 
 bool ArmCtrl::serviceOtherLimbCb(baxter_control::DoAction::Request  &req,

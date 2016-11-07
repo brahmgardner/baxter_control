@@ -38,6 +38,8 @@ private:
 
     ros::Subscriber    control_topic;
 
+    geometry_msgs::Point        _desired_pos;
+
     baxter_core_msgs::JointCommand home_conf;
 
 protected:
@@ -289,6 +291,8 @@ public:
     bool serviceCb(baxter_control::DoAction::Request  &req,
                    baxter_control::DoAction::Response &res);
 
+    void setInitDesiredPose();
+
     /**
      * Callback for the service that lets the two limbs interact
      * @param  req the action request
@@ -299,6 +303,7 @@ public:
                                     baxter_control::DoAction::Response &res);
 
     void moveArmCb(const baxter_control::ArmPos::ConstPtr& msg);
+    void updateDesiredPoseCb(const baxter_control::ArmPos::ConstPtr& msg);
 
     void publishState();
 
@@ -324,6 +329,7 @@ public:
     int         getMarkerID() { return marker_id; };
     int         getObjectID() { return object_id; };
     std::string getObjName();
+    geometry_msgs::Point        getDesiredPos()    { return    _desired_pos; };
 };
 
 #endif

@@ -58,8 +58,8 @@ private:
     ros::Subscriber            _endpt_sub;
     std::vector<double>       _filt_force;
     double                    force_thres;
-
     geometry_msgs::Point        _curr_pos;
+
     geometry_msgs::Quaternion   _curr_ori;
     geometry_msgs::Wrench    _curr_wrench;
 
