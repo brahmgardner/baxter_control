@@ -10,6 +10,7 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
                  RobotInterface(_name, _limb, _no_robot),
                  action(""), sub_state("")
 {
+    desired_flag = 0;
     setHomeConf( 0.0717, -1.0009, 1.1083, 1.5520,
                          -0.5235, 1.3468, 0.4464);
     std::string topic = "/"+getName()+"/state_"+_limb;
@@ -82,28 +83,33 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
 
 void ArmCtrl::InternalThreadEntry()
 {
-    setInitDesiredPose();
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
     _n.param<bool>("internal_recovery",  internal_recovery, true);
     geometry_msgs::Point desiredPose;
-    geometry_msgs::Point currPose;
+    geometry_msgs::Point currPos;
     geometry_msgs::Quaternion ori;
     vector<double> joint_angles;
     ros::Rate r(100);
+    ros::Duration(1.0).sleep();
+    ori = getOri();
     while (true) {
         desiredPose = getDesiredPos();
-        currPose = getPos();
-        ori = getOri();
-        ROS_INFO("Current Position is %f %f %f", currPose.x, currPose.y, currPose.z);
-        ROS_INFO("Desired Position is %f %f %f", desiredPose.x, desiredPose.y, desiredPose.z);
+        currPos = getPos();
         if(!isPositionReached(desiredPose.x, desiredPose.y, desiredPose.z)) {
-            computeIK(currPose.x, currPose.y, currPose.z, ori.x, ori.y, ori.z, ori.w, joint_angles);
+            computeIK(desiredPose.x, desiredPose.y, desiredPose.z, ori.x, ori.y, ori.z, ori.w, joint_angles);
             goToPoseNoCheck(joint_angles);
         }
         r.sleep();
     }
     closeInternalThread();
     return;
+}
+
+geometry_msgs::Point ArmCtrl::getDesiredPos() {
+    if (!desired_flag) {
+        return getPos();
+    }
+    return _desired_pos;
 }
 
 void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
@@ -164,6 +170,8 @@ void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
 
 void ArmCtrl::updateDesiredPoseCb(const baxter_control::ArmPos::ConstPtr& msg)
 {
+    _desired_pos = getPos();
+    desired_flag = 1;
     std::string action = msg->action;
     std::string dir    = msg->dir;
     std::string mode   = msg->mode;

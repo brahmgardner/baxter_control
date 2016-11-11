@@ -316,7 +316,7 @@ bool RobotInterface::isPoseReached(double px, double py, double pz,
 
 bool RobotInterface::isPositionReached(double px, double py, double pz, string mode)
 {
-    ROS_DEBUG("[%s] Checking %s position. Error: %g %g %g", getLimb().c_str(),
+    ROS_INFO("[%s] Checking %s position. Error: %g %g %g", getLimb().c_str(),
                    mode.c_str(), px-getPos().x, py-getPos().y, pz-getPos().z);
 
     if (mode == "strict")
