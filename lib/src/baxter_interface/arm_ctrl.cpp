@@ -80,24 +80,47 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
 //     return;
 // }
 
+float ArmCtrl::ComputeStepSize(float start, float finish, float frequency) {
+    float dist = finish - start;
+    float _time = dist / PICK_UP_SPEED;
+    float num_steps = _time * frequency;
+    return dist / num_steps;
+}
+
 void ArmCtrl::InternalThreadEntry()
 {
     setInitDesiredPose();
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
     _n.param<bool>("internal_recovery",  internal_recovery, true);
-    geometry_msgs::Point desiredPose;
-    geometry_msgs::Point currPose;
+    geometry_msgs::Point desiredPos;
+    geometry_msgs::Point currPos;
     geometry_msgs::Quaternion ori;
     vector<double> joint_angles;
+    float final_x;
+    float final_y;
+    float final_z;
+    float step_size_x;
+    float step_size_y;
+    float step_size_z;
     ros::Rate r(100);
+    ros::Duration(0.5).sleep()
+    ori = getOri();
     while (true) {
-        desiredPose = getDesiredPos();
-        currPose = getPos();
-        ori = getOri();
-        ROS_INFO("Current Position is %f %f %f", currPose.x, currPose.y, currPose.z);
-        ROS_INFO("Desired Position is %f %f %f", desiredPose.x, desiredPose.y, desiredPose.z);
-        if(!isPositionReached(desiredPose.x, desiredPose.y, desiredPose.z)) {
-            computeIK(currPose.x, currPose.y, currPose.z, ori.x, ori.y, ori.z, ori.w, joint_angles);
+        desiredPos = getDesiredPos();
+        currPos = getPos();
+        if (final_x != desiredPos.x || final_y != desiredPos.y || final_z != desiredPos.z) {
+            final_x = desiredPos.x;
+            final_y = desiredPos.y;
+            final_z = desiredPos.z;
+            step_size_x = ComputeStepSize(currPos.x, final_x, 100);
+            step_size_y = ComputeStepSize(currPos.y, final_y, 100);
+            step_size_z = ComputeStepSize(currPos.z, final_z, 100);
+
+        }
+        // ROS_INFO("Current Position is %f %f %f", currPos.x, currPos.y, currPos.z);
+        // ROS_INFO("Desired Position is %f %f %f", desiredPos.x, desiredPos.y, desiredPos.z);
+        if(!isPositionReached(final_x, final_y, final_z)) {
+            computeIK(currPos.x + step_size_x, currPos.y + step_size_y, currPos.z + step_size_z, ori.x, ori.y, ori.z, ori.w, joint_angles);
             goToPoseNoCheck(joint_angles);
         }
         r.sleep();
@@ -106,91 +129,67 @@ void ArmCtrl::InternalThreadEntry()
     return;
 }
 
-void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
-{
-    std::string action = msg->action;
-    std::string dir    = msg->dir;
-    std::string mode   = msg->mode;
-    float dist    = msg->dist;
-    int    obj    = msg->obj;
+// void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
+// {
+//     std::string action = msg->action;
+//     std::string dir    = msg->dir;
+//     std::string mode   = msg->mode;
+//     float dist    = msg->dist;
+//     int    obj    = msg->obj;
 
-    ROS_INFO("[%s] Message request received. Action: %s object: %i", getLimb().c_str(),
-                                                                   action.c_str(), obj);
+//     ROS_INFO("[%s] Message request received. Action: %s object: %i", getLimb().c_str(),
+//                                                                    action.c_str(), obj);
 
-    if (action == PROT_ACTION_LIST)
-    {
-        printActionDB();
-        return;
-    }
+//     if (action == PROT_ACTION_LIST)
+//     {
+//         printActionDB();
+//         return;
+//     }
 
-    if (is_no_robot())
-    {
-        setState(WORKING);
-        ros::Duration(2.0).sleep();
-        setState(DONE);
-        return;
-    }
+//     if (is_no_robot())
+//     {
+//         setState(WORKING);
+//         ros::Duration(2.0).sleep();
+//         setState(DONE);
+//         return;
+//     }
 
-    setDir(dir);
-    setMode(mode);
-    setDist(dist);
-    setAction(action);
-    setObjectID(obj);
+//     setDir(dir);
+//     setMode(mode);
+//     setDist(dist);
+//     setAction(action);
+//     setObjectID(obj);
 
-    startInternalThread();
-    ros::Duration(0.5).sleep();
+//     startInternalThread();
+//     ros::Duration(0.5).sleep();
 
-    ros::Rate r(100);
-    while( ros::ok() && ( int(getState()) != START   &&
-                          int(getState()) != ERROR   &&
-                          int(getState()) != DONE    &&
-                          int(getState()) != PICK_UP   ))
-    {
-        if (ros::isShuttingDown())
-        {
-            setState(KILLED);
-            return;
-        }
+//     ros::Rate r(100);
+//     while( ros::ok() && ( int(getState()) != START   &&
+//                           int(getState()) != ERROR   &&
+//                           int(getState()) != DONE    &&
+//                           int(getState()) != PICK_UP   ))
+//     {
+//         if (ros::isShuttingDown())
+//         {
+//             setState(KILLED);
+//             return;
+//         }
 
-        if (getState()==KILLED)
-        {
-            recoverFromError();
-        }
+//         if (getState()==KILLED)
+//         {
+//             recoverFromError();
+//         }
 
-        r.sleep();
-    }
-    return;
-}
+//         r.sleep();
+//     }
+//     return;
+// }
 
 void ArmCtrl::updateDesiredPoseCb(const baxter_control::ArmPos::ConstPtr& msg)
 {
-    std::string action = msg->action;
-    std::string dir    = msg->dir;
-    std::string mode   = msg->mode;
-    float dist    = msg->dist;
-    int    obj    = msg->obj;
-
-    setDir(dir);
-    setMode(mode);
-    setDist(dist);
-    setAction(action);
-    setObjectID(obj);
-
-    if      (dir == "backward") _desired_pos.x -= dist;
-    else if (dir == "forward")  _desired_pos.x += dist;
-    else if (dir == "right")    _desired_pos.y -= dist;
-    else if (dir == "left")     _desired_pos.y += dist;
-    else if (dir == "down")     _desired_pos.z -= dist;
-    else if (dir == "up")       _desired_pos.z += dist;
-}
-
-void ArmCtrl::setInitDesiredPose() {
-    ros::Duration(0.5).sleep();
-    geometry_msgs::Point point = getPos();
-    ROS_INFO("Current Position is %f %f %f", point.x, point.y, point.z);
-    _desired_pos.x = point.x;
-    _desired_pos.y = point.y;
-    _desired_pos.z = point.z;
+    _desired_pos.x    = msg->xpos;
+    _desired_pos.y    = msg->ypos;
+    _desired_pos.z    = msg->zpos;
 }
 
 bool ArmCtrl::serviceOtherLimbCb(baxter_control::DoAction::Request  &req,
