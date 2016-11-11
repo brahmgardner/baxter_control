@@ -10,6 +10,7 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
                  RobotInterface(_name, _limb, _no_robot),
                  action(""), sub_state("")
 {
+    desired_flag = 0;
     setHomeConf( 0.0717, -1.0009, 1.1083, 1.5520,
                          -0.5235, 1.3468, 0.4464);
     std::string topic = "/"+getName()+"/state_"+_limb;
@@ -26,9 +27,10 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
     service_other_limb = _n.advertiseService(topic, &ArmCtrl::serviceOtherLimbCb,this);
     ROS_INFO("[%s] Created service server with name  : %s", getLimb().c_str(), topic.c_str());
 
-    // insertAction(ACTION_HOME,    &ArmCtrl::goHome);
+    insertAction(ACTION_HOME,    &ArmCtrl::goHome);
     // insertAction(ACTION_RELEASE, &ArmCtrl::releaseObject);
     insertAction(MOVE,      &ArmCtrl::movePose);
+    // callAction(ACTION_HOME);
 
     _n.param<bool>("internal_recovery",  internal_recovery, true);
     ROS_INFO("[%s] Internal_recovery flag set to %s", getLimb().c_str(),
@@ -89,7 +91,6 @@ float ArmCtrl::ComputeStepSize(float start, float finish, float frequency) {
 
 void ArmCtrl::InternalThreadEntry()
 {
-    setInitDesiredPose();
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
     _n.param<bool>("internal_recovery",  internal_recovery, true);
     geometry_msgs::Point desiredPos;
@@ -99,34 +100,59 @@ void ArmCtrl::InternalThreadEntry()
     float final_x;
     float final_y;
     float final_z;
+    float start_x;
+    float start_y;
+    float start_z;
+    float px;
+    float py;
+    float pz;
     float step_size_x;
     float step_size_y;
     float step_size_z;
+    int num_steps;
     ros::Rate r(100);
-    ros::Duration(0.5).sleep()
+    ros::Duration(0.5).sleep();
     ori = getOri();
     while (true) {
-        desiredPos = getDesiredPos();
-        currPos = getPos();
-        if (final_x != desiredPos.x || final_y != desiredPos.y || final_z != desiredPos.z) {
-            final_x = desiredPos.x;
-            final_y = desiredPos.y;
-            final_z = desiredPos.z;
-            step_size_x = ComputeStepSize(currPos.x, final_x, 100);
-            step_size_y = ComputeStepSize(currPos.y, final_y, 100);
-            step_size_z = ComputeStepSize(currPos.z, final_z, 100);
+        if (desired_flag) {
+            while (!isPositionReached(final_x, final_y, final_z)) {
+                desiredPos = getDesiredPos();
+                currPos = getPos();
+                if (desired_flag) {
+                    num_steps = 1;
+                    start_x = currPos.x;
+                    start_y = currPos.y;
+                    start_z = currPos.z;
+                    final_x = desiredPos.x;
+                    final_y = desiredPos.y;
+                    final_z = desiredPos.z;
+                    step_size_x = ComputeStepSize(start_x, final_x, 100);
+                    step_size_y = ComputeStepSize(start_y, final_y, 100);
+                    step_size_z = ComputeStepSize(start_z, final_z, 100);
 
+                }
+                desired_flag = 0;
+                px = start_x + num_steps * step_size_x;
+                py = start_y + num_steps * step_size_y;
+                pz = start_z + num_steps * step_size_z;
+                if(!computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles)) {
+                    break;
+                }
+                goToPoseNoCheck(joint_angles);
+                ++num_steps;
+                r.sleep();
+            }
         }
-        // ROS_INFO("Current Position is %f %f %f", currPos.x, currPos.y, currPos.z);
-        // ROS_INFO("Desired Position is %f %f %f", desiredPos.x, desiredPos.y, desiredPos.z);
-        if(!isPositionReached(final_x, final_y, final_z)) {
-            computeIK(currPos.x + step_size_x, currPos.y + step_size_y, currPos.z + step_size_z, ori.x, ori.y, ori.z, ori.w, joint_angles);
-            goToPoseNoCheck(joint_angles);
-        }
-        r.sleep();
     }
     closeInternalThread();
     return;
+}
+
+geometry_msgs::Point ArmCtrl::getDesiredPos() {
+    if (!desired_flag) {
+        return getPos();
+    }
+    return _desired_pos;
 }
 
 // void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
@@ -187,6 +213,7 @@ void ArmCtrl::InternalThreadEntry()
 
 void ArmCtrl::updateDesiredPoseCb(const baxter_control::ArmPos::ConstPtr& msg)
 {
+    desired_flag = 1;
     _desired_pos.x    = msg->xpos;
     _desired_pos.y    = msg->ypos;
     _desired_pos.z    = msg->zpos;

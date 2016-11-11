@@ -26,6 +26,7 @@ private:
     float             dist;
     int          marker_id;
     int          object_id;
+    int       desired_flag;
 
     // Flag to know if the robot will recover from an error
     // or will wait the external planner to take care of that
@@ -303,6 +304,7 @@ public:
                                     baxter_control::DoAction::Response &res);
 
     void moveArmCb(const baxter_control::ArmPos::ConstPtr& msg);
+    float ComputeStepSize(float start, float finish, float frequency);
     void updateDesiredPoseCb(const baxter_control::ArmPos::ConstPtr& msg);
 
     void publishState();
@@ -329,7 +331,7 @@ public:
     int         getMarkerID() { return marker_id; };
     int         getObjectID() { return object_id; };
     std::string getObjName();
-    geometry_msgs::Point        getDesiredPos()    { return    _desired_pos; };
+    geometry_msgs::Point        getDesiredPos();
 };
 
 #endif
