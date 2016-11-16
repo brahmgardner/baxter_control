@@ -78,7 +78,7 @@ void RobotInterface::collAvCb(const baxter_core_msgs::CollisionAvoidanceState& m
         {
             objects = objects + " " + msg.collision_object[i];
         }
-        ROS_WARN("[%s] Collision detected with: %s", getLimb().c_str(), objects.c_str());
+        ROS_WARN_ONCE("[%s] Collision detected with: %s", getLimb().c_str(), objects.c_str());
     }
     else is_colliding = false;
 }

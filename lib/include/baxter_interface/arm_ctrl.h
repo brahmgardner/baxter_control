@@ -26,7 +26,8 @@ private:
     float             dist;
     int          marker_id;
     int          object_id;
-    int       desired_flag;
+    int        update_flag;
+    int       reached_flag;
 
     // Flag to know if the robot will recover from an error
     // or will wait the external planner to take care of that

@@ -1,6 +1,7 @@
 #include "baxter_interface/arm_ctrl.h"
 #include "baxter_control/ArmPos.h"
 #include <pthread.h>
+#include <math.h>
 
 using namespace std;
 using namespace geometry_msgs;
@@ -10,7 +11,8 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
                  RobotInterface(_name, _limb, _no_robot),
                  action(""), sub_state("")
 {
-    desired_flag = 0;
+    update_flag = 0;
+    reached_flag = 1;
     setHomeConf( 0.0717, -1.0009, 1.1083, 1.5520,
                          -0.5235, 1.3468, 0.4464);
     std::string topic = "/"+getName()+"/state_"+_limb;
@@ -30,7 +32,7 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
     insertAction(ACTION_HOME,    &ArmCtrl::goHome);
     // insertAction(ACTION_RELEASE, &ArmCtrl::releaseObject);
     insertAction(MOVE,      &ArmCtrl::movePose);
-    // callAction(ACTION_HOME);
+    callAction(ACTION_HOME);
 
     _n.param<bool>("internal_recovery",  internal_recovery, true);
     ROS_INFO("[%s] Internal_recovery flag set to %s", getLimb().c_str(),
@@ -84,9 +86,24 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
 
 float ArmCtrl::ComputeStepSize(float start, float finish, float frequency) {
     float dist = finish - start;
+    ROS_INFO("dist: %f, pickup speed: %f", dist, PICK_UP_SPEED);
     float _time = dist / PICK_UP_SPEED;
+    ROS_INFO("_time: %f", time);
     float num_steps = _time * frequency;
+    ROS_INFO("num_steps: %f", num_steps);
     return dist / num_steps;
+}
+
+float AmrCtrl::vector_norm(geometry_msgs::Point x) {
+    return sqrt((x * x) + (y * y) + (z * z))
+}
+
+geometry_msgs::Point ArmCtrl::vector_difference(geometry_msgs::Point x0, geometry_msgs::Point x1) {
+    geometry_msgs::Point difference;
+    difference.x = x1.x - x0.x;
+    difference.y = x1.y - x0.y;
+    difference.z = x1.z - x0.z;
+    return difference;
 }
 
 void ArmCtrl::InternalThreadEntry()
@@ -113,12 +130,16 @@ void ArmCtrl::InternalThreadEntry()
     ros::Rate r(100);
     ros::Duration(0.5).sleep();
     ori = getOri();
+    int i = 0;
+    currPos = getPos();
+    ROS_INFO("sqrt 4:%f sqrt 5: %f", sqrt(4), sqrt(5));
+    ROS_INFO("curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
     while (true) {
-        if (desired_flag) {
+        if (!reached_flag) {
             while (!isPositionReached(final_x, final_y, final_z)) {
                 desiredPos = getDesiredPos();
                 currPos = getPos();
-                if (desired_flag) {
+                if (update_flag) {
                     num_steps = 1;
                     start_x = currPos.x;
                     start_y = currPos.y;
@@ -129,19 +150,28 @@ void ArmCtrl::InternalThreadEntry()
                     step_size_x = ComputeStepSize(start_x, final_x, 100);
                     step_size_y = ComputeStepSize(start_y, final_y, 100);
                     step_size_z = ComputeStepSize(start_z, final_z, 100);
-
+                    ROS_INFO("step_size x:%f step_size y:%f step_size z:%f", step_size_x, step_size_y, step_size_z);
+                    update_flag = 0;
                 }
-                desired_flag = 0;
                 px = start_x + num_steps * step_size_x;
                 py = start_y + num_steps * step_size_y;
                 pz = start_z + num_steps * step_size_z;
-                if(!computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles)) {
-                    break;
+                // if(!computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles)) {
+                //     break;
+                // }
+                if (i % 100 == 0) {
+                    ROS_INFO("curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
+                    ROS_INFO("px:%f py:%f pz:%f", px, py, pz);
+                    ROS_INFO("desired x:%f desired y:%f desired z:%f", desiredPos.x, desiredPos.y, desiredPos.z);
+                    ROS_INFO("update flag:%f", update_flag);
                 }
+                computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles);
                 goToPoseNoCheck(joint_angles);
                 ++num_steps;
                 r.sleep();
+                ++i;
             }
+            reached_flag = 1;
         }
     }
     closeInternalThread();
@@ -149,7 +179,7 @@ void ArmCtrl::InternalThreadEntry()
 }
 
 geometry_msgs::Point ArmCtrl::getDesiredPos() {
-    if (!desired_flag) {
+    if (reached_flag) {
         return getPos();
     }
     return _desired_pos;
@@ -213,7 +243,8 @@ geometry_msgs::Point ArmCtrl::getDesiredPos() {
 
 void ArmCtrl::updateDesiredPoseCb(const baxter_control::ArmPos::ConstPtr& msg)
 {
-    desired_flag = 1;
+    reached_flag = 0;
+    update_flag = 1;
     _desired_pos.x    = msg->xpos;
     _desired_pos.y    = msg->ypos;
     _desired_pos.z    = msg->zpos;
