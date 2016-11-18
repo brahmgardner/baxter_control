@@ -94,8 +94,8 @@ float ArmCtrl::ComputeStepSize(float start, float finish, float frequency) {
     return dist / num_steps;
 }
 
-float AmrCtrl::vector_norm(geometry_msgs::Point x) {
-    return sqrt((x * x) + (y * y) + (z * z))
+float ArmCtrl::vector_norm(geometry_msgs::Point x) {
+    return sqrt((x.x * x.x) + (x.y * x.y) + (x.z * x.z));
 }
 
 geometry_msgs::Point ArmCtrl::vector_difference(geometry_msgs::Point x0, geometry_msgs::Point x1) {
@@ -112,21 +112,17 @@ void ArmCtrl::InternalThreadEntry()
     _n.param<bool>("internal_recovery",  internal_recovery, true);
     geometry_msgs::Point desiredPos;
     geometry_msgs::Point currPos;
+    geometry_msgs::Point difference;
     geometry_msgs::Quaternion ori;
     vector<double> joint_angles;
-    float final_x;
-    float final_y;
-    float final_z;
     float start_x;
     float start_y;
     float start_z;
     float px;
     float py;
     float pz;
-    float step_size_x;
-    float step_size_y;
-    float step_size_z;
-    int num_steps;
+    float norm;
+    ros::Time start_time;
     ros::Rate r(100);
     ros::Duration(0.5).sleep();
     ori = getOri();
@@ -136,26 +132,22 @@ void ArmCtrl::InternalThreadEntry()
     ROS_INFO("curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
     while (true) {
         if (!reached_flag) {
-            while (!isPositionReached(final_x, final_y, final_z)) {
+            while (!isPositionReached(desiredPos.x, desiredPos.y, desiredPos.z)) {
                 desiredPos = getDesiredPos();
                 currPos = getPos();
                 if (update_flag) {
-                    num_steps = 1;
+                    start_time = ros::Time::now();
                     start_x = currPos.x;
                     start_y = currPos.y;
                     start_z = currPos.z;
-                    final_x = desiredPos.x;
-                    final_y = desiredPos.y;
-                    final_z = desiredPos.z;
-                    step_size_x = ComputeStepSize(start_x, final_x, 100);
-                    step_size_y = ComputeStepSize(start_y, final_y, 100);
-                    step_size_z = ComputeStepSize(start_z, final_z, 100);
-                    ROS_INFO("step_size x:%f step_size y:%f step_size z:%f", step_size_x, step_size_y, step_size_z);
+                    difference = vector_difference(currPos, desiredPos);
+                    norm = vector_norm(difference);
                     update_flag = 0;
                 }
-                px = start_x + num_steps * step_size_x;
-                py = start_y + num_steps * step_size_y;
-                pz = start_z + num_steps * step_size_z;
+                double t_elap = (ros::Time::now() - start_time).toSec();
+                px = start_x + (difference.x / norm)  * PICK_UP_SPEED * t_elap;
+                py = start_y + (difference.y / norm)  * PICK_UP_SPEED * t_elap;
+                pz = start_z + (difference.z / norm)  * PICK_UP_SPEED * t_elap;
                 // if(!computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles)) {
                 //     break;
                 // }
@@ -167,10 +159,12 @@ void ArmCtrl::InternalThreadEntry()
                 }
                 computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles);
                 goToPoseNoCheck(joint_angles);
-                ++num_steps;
                 r.sleep();
                 ++i;
             }
+            ROS_INFO("POSITION REACHED!!");
+            ROS_INFO("curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
+            ROS_INFO("desired x:%f desired y:%f desired z:%f", desiredPos.x, desiredPos.y, desiredPos.z);
             reached_flag = 1;
         }
     }

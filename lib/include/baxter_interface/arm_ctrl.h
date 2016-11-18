@@ -273,6 +273,9 @@ protected:
      * @return   true/false if success/failure
      */
 
+    float vector_norm(geometry_msgs::Point x);
+    geometry_msgs::Point vector_difference(geometry_msgs::Point x0, geometry_msgs::Point x1);
+
 public:
     /**
      * Constructor
