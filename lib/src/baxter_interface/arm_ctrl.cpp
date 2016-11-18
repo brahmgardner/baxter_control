@@ -88,7 +88,7 @@ float ArmCtrl::ComputeStepSize(float start, float finish, float frequency) {
     float dist = finish - start;
     ROS_INFO("dist: %f, pickup speed: %f", dist, PICK_UP_SPEED);
     float _time = dist / PICK_UP_SPEED;
-    ROS_INFO("_time: %f", time);
+    // ROS_INFO("_time: %f", time);
     float num_steps = _time * frequency;
     ROS_INFO("num_steps: %f", num_steps);
     return dist / num_steps;
@@ -123,6 +123,7 @@ void ArmCtrl::InternalThreadEntry()
     float pz;
     float norm;
     ros::Time start_time;
+    float time_to_dest;
     ros::Rate r(100);
     ros::Duration(0.5).sleep();
     ori = getOri();
@@ -130,43 +131,50 @@ void ArmCtrl::InternalThreadEntry()
     currPos = getPos();
     ROS_INFO("sqrt 4:%f sqrt 5: %f", sqrt(4), sqrt(5));
     ROS_INFO("curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
-    while (true) {
+    while (RobotInterface::ok()) {
         if (!reached_flag) {
-            while (!isPositionReached(desiredPos.x, desiredPos.y, desiredPos.z)) {
+            desiredPos = getDesiredPos();
+            while (RobotInterface::ok() && !isPositionReached(desiredPos.x, desiredPos.y, desiredPos.z)) {
                 desiredPos = getDesiredPos();
                 currPos = getPos();
                 if (update_flag) {
+                    ROS_INFO("We've got a new desired position!!!!!!!!!!!!!");
                     start_time = ros::Time::now();
                     start_x = currPos.x;
                     start_y = currPos.y;
                     start_z = currPos.z;
                     difference = vector_difference(currPos, desiredPos);
                     norm = vector_norm(difference);
+                    time_to_dest = norm / PICK_UP_SPEED;
                     update_flag = 0;
                 }
                 double t_elap = (ros::Time::now() - start_time).toSec();
-                px = start_x + (difference.x / norm)  * PICK_UP_SPEED * t_elap;
-                py = start_y + (difference.y / norm)  * PICK_UP_SPEED * t_elap;
-                pz = start_z + (difference.z / norm)  * PICK_UP_SPEED * t_elap;
-                // if(!computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles)) {
-                //     break;
-                // }
-                if (i % 100 == 0) {
-                    ROS_INFO("curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
-                    ROS_INFO("px:%f py:%f pz:%f", px, py, pz);
-                    ROS_INFO("desired x:%f desired y:%f desired z:%f", desiredPos.x, desiredPos.y, desiredPos.z);
-                    ROS_INFO("update flag:%f", update_flag);
+                if (t_elap < time_to_dest) {
+                    px = start_x + (difference.x / norm)  * PICK_UP_SPEED * t_elap;
+                    py = start_y + (difference.y / norm)  * PICK_UP_SPEED * t_elap;
+                    pz = start_z + (difference.z / norm)  * PICK_UP_SPEED * t_elap;
+                } else {
+                    px = desiredPos.x;
+                    py = desiredPos.y;
+                    pz = desiredPos.z;
                 }
+
+                ROS_INFO_THROTTLE(0.5,"curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
+                ROS_INFO_THROTTLE(0.5,"px:%f py:%f pz:%f", px, py, pz);
+                ROS_INFO_THROTTLE(0.5,"desired x:%f desired y:%f desired z:%f", desiredPos.x, desiredPos.y, desiredPos.z);
+                ROS_INFO_THROTTLE(0.5,"update flag:%i", update_flag);
+
                 computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles);
                 goToPoseNoCheck(joint_angles);
-                r.sleep();
                 ++i;
+                r.sleep();
             }
             ROS_INFO("POSITION REACHED!!");
             ROS_INFO("curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
             ROS_INFO("desired x:%f desired y:%f desired z:%f", desiredPos.x, desiredPos.y, desiredPos.z);
             reached_flag = 1;
         }
+        r.sleep();
     }
     closeInternalThread();
     return;
