@@ -9,19 +9,23 @@ project(baxterControl)
 # find_package(OpenCV REQUIRED)
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${baxter_collaboration_INCLUDE_DIRS})
 
 ## Declare a C++ library
 # add_library(robot_utils     include/robot_interface/utils.h
 #                             src/robot_interface/utils.cpp)
 
-add_library(baxter_interface include/baxter_interface/ros_thread.h
-                            include/baxter_interface/robot_interface.h
-                            include/baxter_interface/arm_ctrl.h
-                            include/baxter_interface/utils.h
-                            src/baxter_interface/ros_thread.cpp
-                            src/baxter_interface/baxter_trac_ik.cpp
-                            src/baxter_interface/utils.cpp
-                            src/baxter_interface/robot_interface.cpp
+# add_library(baxter_interface include/baxter_interface/ros_thread.h
+#                             include/baxter_interface/robot_interface.h
+#                             include/baxter_interface/arm_ctrl.h
+#                             include/baxter_interface/utils.h
+#                             src/baxter_interface/ros_thread.cpp
+#                             src/baxter_interface/baxter_trac_ik.cpp
+#                             src/baxter_interface/utils.cpp
+#                             src/baxter_interface/robot_interface.cpp
+#                             src/baxter_interface/arm_ctrl.cpp)
+
+add_library(baxter_interface include/baxter_interface/arm_ctrl.h
                             src/baxter_interface/arm_ctrl.cpp)
 
 ## Add cmake target dependencies of the library

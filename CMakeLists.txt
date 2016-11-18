@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
              cv_bridge
              image_transport
              trac_ik_lib
+             baxter_collaboration
              )
 
 find_package(OpenCV 2.4 REQUIRED)
@@ -115,9 +116,11 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(lib/include
+                    ${baxter_collaboration_INCLUDE_DIRS}
                     ${OpenCV_INCLUDE_DIRS}
                     ${catkin_INCLUDE_DIRS}
                     ${CMAKE_CURRENT_SOURCE_DIR})
+message(${catkin_INCLUDE_DIRS})
 
 ## Add C++ libraries
 add_subdirectory(lib)

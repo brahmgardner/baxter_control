@@ -3,7 +3,7 @@
 
 #include <map>
 
-#include "baxter_interface/robot_interface.h"
+#include <robot_interface/robot_interface.h>
 
 #include "baxter_control/DoAction.h"
 #include "baxter_control/ArmState.h"
