@@ -7,6 +7,8 @@ using namespace std;
 using namespace geometry_msgs;
 using namespace baxter_core_msgs;
 
+#define MOVE "move"
+
 ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
                  RobotInterface(_name, _limb, _no_robot),
                  action(""), sub_state("")
