@@ -3,7 +3,7 @@
 
 #include <map>
 
-#include "baxter_interface/robot_interface.h"
+#include <robot_interface/robot_interface.h>
 
 #include "baxter_control/DoAction.h"
 #include "baxter_control/ArmState.h"
@@ -26,7 +26,8 @@ private:
     float             dist;
     int          marker_id;
     int          object_id;
-    int       desired_flag;
+    int        update_flag;
+    int       reached_flag;
 
     // Flag to know if the robot will recover from an error
     // or will wait the external planner to take care of that
@@ -272,6 +273,9 @@ protected:
      * @return   true/false if success/failure
      */
 
+    float vector_norm(geometry_msgs::Point x);
+    geometry_msgs::Point vector_difference(geometry_msgs::Point x0, geometry_msgs::Point x1);
+
 public:
     /**
      * Constructor
@@ -304,6 +308,7 @@ public:
                                     baxter_control::DoAction::Response &res);
 
     void moveArmCb(const baxter_control::ArmPos::ConstPtr& msg);
+    float ComputeStepSize(float start, float finish, float frequency);
     void updateDesiredPoseCb(const baxter_control::ArmPos::ConstPtr& msg);
 
     void publishState();

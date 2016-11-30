@@ -1,16 +1,20 @@
 #include "baxter_interface/arm_ctrl.h"
 #include "baxter_control/ArmPos.h"
 #include <pthread.h>
+#include <math.h>
 
 using namespace std;
 using namespace geometry_msgs;
 using namespace baxter_core_msgs;
 
+#define MOVE "move"
+
 ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
                  RobotInterface(_name, _limb, _no_robot),
                  action(""), sub_state("")
 {
-    desired_flag = 0;
+    update_flag = 0;
+    reached_flag = 1;
     setHomeConf( 0.0717, -1.0009, 1.1083, 1.5520,
                          -0.5235, 1.3468, 0.4464);
     std::string topic = "/"+getName()+"/state_"+_limb;
@@ -27,9 +31,10 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
     service_other_limb = _n.advertiseService(topic, &ArmCtrl::serviceOtherLimbCb,this);
     ROS_INFO("[%s] Created service server with name  : %s", getLimb().c_str(), topic.c_str());
 
-    // insertAction(ACTION_HOME,    &ArmCtrl::goHome);
+    insertAction(ACTION_HOME,    &ArmCtrl::goHome);
     // insertAction(ACTION_RELEASE, &ArmCtrl::releaseObject);
     insertAction(MOVE,      &ArmCtrl::movePose);
+    callAction(ACTION_HOME);
 
     _n.param<bool>("internal_recovery",  internal_recovery, true);
     ROS_INFO("[%s] Internal_recovery flag set to %s", getLimb().c_str(),
@@ -81,23 +86,95 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
 //     return;
 // }
 
+float ArmCtrl::ComputeStepSize(float start, float finish, float frequency) {
+    float dist = finish - start;
+    ROS_INFO("dist: %f, pickup speed: %f", dist, PICK_UP_SPEED);
+    float _time = dist / PICK_UP_SPEED;
+    // ROS_INFO("_time: %f", time);
+    float num_steps = _time * frequency;
+    ROS_INFO("num_steps: %f", num_steps);
+    return dist / num_steps;
+}
+
+float ArmCtrl::vector_norm(geometry_msgs::Point x) {
+    return sqrt((x.x * x.x) + (x.y * x.y) + (x.z * x.z));
+}
+
+geometry_msgs::Point ArmCtrl::vector_difference(geometry_msgs::Point x0, geometry_msgs::Point x1) {
+    geometry_msgs::Point difference;
+    difference.x = x1.x - x0.x;
+    difference.y = x1.y - x0.y;
+    difference.z = x1.z - x0.z;
+    return difference;
+}
+
 void ArmCtrl::InternalThreadEntry()
 {
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
     _n.param<bool>("internal_recovery",  internal_recovery, true);
-    geometry_msgs::Point desiredPose;
+    geometry_msgs::Point desiredPos;
     geometry_msgs::Point currPos;
+    geometry_msgs::Point difference;
     geometry_msgs::Quaternion ori;
     vector<double> joint_angles;
+    float start_x;
+    float start_y;
+    float start_z;
+    float px;
+    float py;
+    float pz;
+    float norm;
+    ros::Time start_time;
+    float time_to_dest;
     ros::Rate r(100);
-    ros::Duration(1.0).sleep();
+    ros::Duration(0.5).sleep();
     ori = getOri();
-    while (true) {
-        desiredPose = getDesiredPos();
-        currPos = getPos();
-        if(!isPositionReached(desiredPose.x, desiredPose.y, desiredPose.z)) {
-            computeIK(desiredPose.x, desiredPose.y, desiredPose.z, ori.x, ori.y, ori.z, ori.w, joint_angles);
-            goToPoseNoCheck(joint_angles);
+    int i = 0;
+    currPos = getPos();
+    ROS_INFO("sqrt 4:%f sqrt 5: %f", sqrt(4), sqrt(5));
+    ROS_INFO("curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
+    while (RobotInterface::ok()) {
+        if (!reached_flag) {
+            desiredPos = getDesiredPos();
+            while (RobotInterface::ok() && !isPositionReached(desiredPos.x, desiredPos.y, desiredPos.z)) {
+                desiredPos = getDesiredPos();
+                currPos = getPos();
+                if (update_flag) {
+                    ROS_INFO("We've got a new desired position!!!!!!!!!!!!!");
+                    start_time = ros::Time::now();
+                    start_x = currPos.x;
+                    start_y = currPos.y;
+                    start_z = currPos.z;
+                    difference = vector_difference(currPos, desiredPos);
+                    norm = vector_norm(difference);
+                    time_to_dest = norm / PICK_UP_SPEED;
+                    update_flag = 0;
+                }
+                double t_elap = (ros::Time::now() - start_time).toSec();
+                if (t_elap < time_to_dest) {
+                    px = start_x + (difference.x / norm)  * PICK_UP_SPEED * t_elap;
+                    py = start_y + (difference.y / norm)  * PICK_UP_SPEED * t_elap;
+                    pz = start_z + (difference.z / norm)  * PICK_UP_SPEED * t_elap;
+                } else {
+                    px = desiredPos.x;
+                    py = desiredPos.y;
+                    pz = desiredPos.z;
+                }
+
+                ROS_INFO_THROTTLE(0.5,"curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
+                ROS_INFO_THROTTLE(0.5,"px:%f py:%f pz:%f", px, py, pz);
+                ROS_INFO_THROTTLE(0.5,"desired x:%f desired y:%f desired z:%f", desiredPos.x, desiredPos.y, desiredPos.z);
+                ROS_INFO_THROTTLE(0.5,"update flag:%i", update_flag);
+
+                computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles);
+                goToPoseNoCheck(joint_angles);
+                ++i;
+                r.sleep();
+            }
+            ROS_INFO("POSITION REACHED!!");
+            ROS_INFO("curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
+            ROS_INFO("desired x:%f desired y:%f desired z:%f", desiredPos.x, desiredPos.y, desiredPos.z);
+            reached_flag = 1;
         }
         r.sleep();
     }
@@ -106,99 +183,75 @@ void ArmCtrl::InternalThreadEntry()
 }
 
 geometry_msgs::Point ArmCtrl::getDesiredPos() {
-    if (!desired_flag) {
+    if (reached_flag) {
         return getPos();
     }
     return _desired_pos;
 }
 
-void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
-{
-    std::string action = msg->action;
-    std::string dir    = msg->dir;
-    std::string mode   = msg->mode;
-    float dist    = msg->dist;
-    int    obj    = msg->obj;
+// void ArmCtrl::moveArmCb(const baxter_control::ArmPos::ConstPtr& msg)
+// {
+//     std::string action = msg->action;
+//     std::string dir    = msg->dir;
+//     std::string mode   = msg->mode;
+//     float dist    = msg->dist;
+//     int    obj    = msg->obj;
 
-    ROS_INFO("[%s] Message request received. Action: %s object: %i", getLimb().c_str(),
-                                                                   action.c_str(), obj);
+//     ROS_INFO("[%s] Message request received. Action: %s object: %i", getLimb().c_str(),
+//                                                                    action.c_str(), obj);
 
-    if (action == PROT_ACTION_LIST)
-    {
-        printActionDB();
-        return;
-    }
+//     if (action == PROT_ACTION_LIST)
+//     {
+//         printActionDB();
+//         return;
+//     }
 
-    if (is_no_robot())
-    {
-        setState(WORKING);
-        ros::Duration(2.0).sleep();
-        setState(DONE);
-        return;
-    }
+//     if (is_no_robot())
+//     {
+//         setState(WORKING);
+//         ros::Duration(2.0).sleep();
+//         setState(DONE);
+//         return;
+//     }
 
-    setDir(dir);
-    setMode(mode);
-    setDist(dist);
-    setAction(action);
-    setObjectID(obj);
+//     setDir(dir);
+//     setMode(mode);
+//     setDist(dist);
+//     setAction(action);
+//     setObjectID(obj);
 
-    startInternalThread();
-    ros::Duration(0.5).sleep();
+//     startInternalThread();
+//     ros::Duration(0.5).sleep();
 
-    ros::Rate r(100);
-    while( ros::ok() && ( int(getState()) != START   &&
-                          int(getState()) != ERROR   &&
-                          int(getState()) != DONE    &&
-                          int(getState()) != PICK_UP   ))
-    {
-        if (ros::isShuttingDown())
-        {
-            setState(KILLED);
-            return;
-        }
+//     ros::Rate r(100);
+//     while( ros::ok() && ( int(getState()) != START   &&
+//                           int(getState()) != ERROR   &&
+//                           int(getState()) != DONE    &&
+//                           int(getState()) != PICK_UP   ))
+//     {
+//         if (ros::isShuttingDown())
+//         {
+//             setState(KILLED);
+//             return;
+//         }
 
-        if (getState()==KILLED)
-        {
-            recoverFromError();
-        }
+//         if (getState()==KILLED)
+//         {
+//             recoverFromError();
+//         }
 
-        r.sleep();
-    }
-    return;
-}
+//         r.sleep();
+//     }
+//     return;
+// }
 
 void ArmCtrl::updateDesiredPoseCb(const baxter_control::ArmPos::ConstPtr& msg)
 {
-    _desired_pos = getPos();
-    desired_flag = 1;
-    std::string action = msg->action;
-    std::string dir    = msg->dir;
-    std::string mode   = msg->mode;
-    float dist    = msg->dist;
-    int    obj    = msg->obj;
-
-    setDir(dir);
-    setMode(mode);
-    setDist(dist);
-    setAction(action);
-    setObjectID(obj);
-
-    if      (dir == "backward") _desired_pos.x -= dist;
-    else if (dir == "forward")  _desired_pos.x += dist;
-    else if (dir == "right")    _desired_pos.y -= dist;
-    else if (dir == "left")     _desired_pos.y += dist;
-    else if (dir == "down")     _desired_pos.z -= dist;
-    else if (dir == "up")       _desired_pos.z += dist;
-}
-
-void ArmCtrl::setInitDesiredPose() {
-    ros::Duration(0.5).sleep();
-    geometry_msgs::Point point = getPos();
-    ROS_INFO("Current Position is %f %f %f", point.x, point.y, point.z);
-    _desired_pos.x = point.x;
-    _desired_pos.y = point.y;
-    _desired_pos.z = point.z;
+    reached_flag = 0;
+    update_flag = 1;
+    _desired_pos.x    = msg->xpos;
+    _desired_pos.y    = msg->ypos;
+    _desired_pos.z    = msg->zpos;
 }
 
 bool ArmCtrl::serviceOtherLimbCb(baxter_control::DoAction::Request  &req,
