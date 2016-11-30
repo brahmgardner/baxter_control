@@ -9,15 +9,9 @@
 #include "baxter_control/ArmState.h"
 #include "baxter_control/ArmPos.h"
 
-#define HAND_OVER_START  "handover_start"
-#define HAND_OVER_READY  "handover_ready"
-#define HAND_OVER_DONE   "handover_done"
-#define HAND_OVER_WAIT   "handover_wait"
-
-class ArmCtrl : public RobotInterface
+class ArmCtrl : public RobotInterface, public ROSThread
 {
 private:
-    std::string       name;
     std::string  sub_state;
 
     std::string     action;
@@ -314,7 +308,6 @@ public:
     void publishState();
 
     /* Self-explaining "setters" */
-    void setName(std::string _name)      { name      =   _name; };
     void setSubState(std::string _state) { sub_state =  _state; };
     void setMarkerID(int _id)            { marker_id =     _id; };
     virtual void setObjectID(int _obj)   { object_id =    _obj; };
@@ -326,7 +319,6 @@ public:
     void setState(int _state);
 
     /* Self-explaining "getters" */
-    std::string getName()     { return      name; };
     std::string getSubState() { return sub_state; };
     std::string getAction()   { return    action; };
     std::string getDir()      { return       dir; };
