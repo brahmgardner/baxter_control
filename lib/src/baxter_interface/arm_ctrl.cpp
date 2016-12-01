@@ -44,48 +44,6 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
 
 }
 
-// void ArmCtrl::InternalThreadEntry()
-// {
-//     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
-//     _n.param<bool>("internal_recovery",  internal_recovery, true);
-
-//     std::string a =     getAction();
-//     int         s = int(getState());
-
-//     ROS_INFO("action called is: [%s]", a.c_str());
-
-//     setState(WORKING);
-
-//     if (a == ACTION_HOME || a == ACTION_RELEASE)
-//     {
-//         if (callAction(a))   setState(DONE);
-//     }
-//     else if (s == START || s == ERROR ||
-//              s == DONE  || s == KILLED )
-//     {
-//         if (doAction(s, a))   setState(DONE);
-//         else                  setState(ERROR);
-//     }
-//     else
-//     {
-//         ROS_ERROR("[%s] Invalid Action %s in state %i", getLimb().c_str(), a.c_str(), s);
-//     }
-
-//     if (getState()==WORKING)
-//     {
-//         setState(ERROR);
-//     }
-
-//     if (getState()==ERROR)
-//     {
-//         ROS_ERROR("[%s] Action %s not successful! State %s %s", getLimb().c_str(), a.c_str(),
-//                                           string(getState()).c_str(), getSubState().c_str());
-//     }
-
-//     closeInternalThread();
-//     return;
-// }
-
 float ArmCtrl::ComputeStepSize(float start, float finish, float frequency) {
     float dist = finish - start;
     ROS_INFO("dist: %f, pickup speed: %f", dist, PICK_UP_SPEED);
@@ -130,6 +88,7 @@ void ArmCtrl::InternalThreadEntry()
     ros::Duration(0.5).sleep();
     ori = getOri();
     int i = 0;
+    initPrevJointAngles();
     currPos = getPos();
     ROS_INFO("sqrt 4:%f sqrt 5: %f", sqrt(4), sqrt(5));
     ROS_INFO("curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
@@ -151,23 +110,25 @@ void ArmCtrl::InternalThreadEntry()
                     update_flag = 0;
                 }
                 double t_elap = (ros::Time::now() - start_time).toSec();
-                if (t_elap < time_to_dest) {
-                    px = start_x + (difference.x / norm)  * PICK_UP_SPEED * t_elap;
-                    py = start_y + (difference.y / norm)  * PICK_UP_SPEED * t_elap;
-                    pz = start_z + (difference.z / norm)  * PICK_UP_SPEED * t_elap;
-                } else {
-                    px = desiredPos.x;
-                    py = desiredPos.y;
-                    pz = desiredPos.z;
-                }
+                // if (t_elap < time_to_dest) {
+                //     px = start_x + (difference.x / norm)  * PICK_UP_SPEED * t_elap;
+                //     py = start_y + (difference.y / norm)  * PICK_UP_SPEED * t_elap;
+                //     pz = start_z + (difference.z / norm)  * PICK_UP_SPEED * t_elap;
+                // } else {
+                //     px = desiredPos.x;
+                //     py = desiredPos.y;
+                //     pz = desiredPos.z;
+                // }
+                px = start_x + (difference.x / norm)  * PICK_UP_SPEED * t_elap;
+                py = start_y + (difference.y / norm)  * PICK_UP_SPEED * t_elap;
+                pz = start_z + (difference.z / norm)  * PICK_UP_SPEED * t_elap;
 
                 ROS_INFO_THROTTLE(0.5,"curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
                 ROS_INFO_THROTTLE(0.5,"px:%f py:%f pz:%f", px, py, pz);
                 ROS_INFO_THROTTLE(0.5,"desired x:%f desired y:%f desired z:%f", desiredPos.x, desiredPos.y, desiredPos.z);
                 ROS_INFO_THROTTLE(0.5,"update flag:%i", update_flag);
 
-                computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles);
-                goToPoseNoCheck(joint_angles);
+                updateVelocities(px, py, pz, ori.x, ori.y, ori.z, ori.w);
                 ++i;
                 r.sleep();
             }
