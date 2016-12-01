@@ -167,7 +167,7 @@ void ArmCtrl::InternalThreadEntry()
                 ROS_INFO_THROTTLE(0.5,"update flag:%i", update_flag);
 
                 computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles);
-                goToPoseNoCheck(joint_angles);
+                goToJointPoseNoCheck(joint_angles);
                 ++i;
                 r.sleep();
             }
@@ -514,7 +514,7 @@ bool ArmCtrl::moveArm(string dir, double dist, string mode, bool disable_coll_av
         vector<double> joint_angles;
         if (!computeIK(px, py, pz, ox, oy, oz, ow, joint_angles)) return false;
 
-        if (!goToPoseNoCheck(joint_angles))   return false;
+        if (!goToJointPoseNoCheck(joint_angles))   return false;
 
         if (isPositionReached(final.x, final.y, final.z, mode)) return true;
 
