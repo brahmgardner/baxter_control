@@ -88,8 +88,8 @@ ArmCtrl::ArmCtrl(string _name, string _limb, bool _no_robot) :
 
 float ArmCtrl::ComputeStepSize(float start, float finish, float frequency) {
     float dist = finish - start;
-    ROS_INFO("dist: %f, pickup speed: %f", dist, PICK_UP_SPEED);
-    float _time = dist / PICK_UP_SPEED;
+    ROS_INFO("dist: %f, pickup speed: %f", dist, ARM_SPEED);
+    float _time = dist / ARM_SPEED;
     // ROS_INFO("_time: %f", time);
     float num_steps = _time * frequency;
     ROS_INFO("num_steps: %f", num_steps);
@@ -147,14 +147,14 @@ void ArmCtrl::InternalThreadEntry()
                     start_z = currPos.z;
                     difference = vector_difference(currPos, desiredPos);
                     norm = vector_norm(difference);
-                    time_to_dest = norm / PICK_UP_SPEED;
+                    time_to_dest = norm / ARM_SPEED;
                     update_flag = 0;
                 }
                 double t_elap = (ros::Time::now() - start_time).toSec();
                 if (t_elap < time_to_dest) {
-                    px = start_x + (difference.x / norm)  * PICK_UP_SPEED * t_elap;
-                    py = start_y + (difference.y / norm)  * PICK_UP_SPEED * t_elap;
-                    pz = start_z + (difference.z / norm)  * PICK_UP_SPEED * t_elap;
+                    px = start_x + (difference.x / norm)  * ARM_SPEED * t_elap;
+                    py = start_y + (difference.y / norm)  * ARM_SPEED * t_elap;
+                    pz = start_z + (difference.z / norm)  * ARM_SPEED * t_elap;
                 } else {
                     px = desiredPos.x;
                     py = desiredPos.y;
@@ -459,7 +459,7 @@ bool ArmCtrl::moveArm(string dir, double dist, string mode, bool disable_coll_av
             if (dir == "backward" | dir == "forward")
             {
                 int sgn = dir=="backward"?-1:+1;
-                px = px + sgn * PICK_UP_SPEED * t_elap;
+                px = px + sgn * ARM_SPEED * t_elap;
 
                 if (dir == "backward")
                 {
@@ -473,7 +473,7 @@ bool ArmCtrl::moveArm(string dir, double dist, string mode, bool disable_coll_av
             if (dir == "right" | dir == "left")
             {
                 int sgn = dir=="right"?-1:+1;
-                py = py + sgn * PICK_UP_SPEED * t_elap;
+                py = py + sgn * ARM_SPEED * t_elap;
 
                 if (dir == "right")
                 {
@@ -487,7 +487,7 @@ bool ArmCtrl::moveArm(string dir, double dist, string mode, bool disable_coll_av
             if (dir == "down" | dir == "up")
             {
                 int sgn = dir=="down"?-1:+1;
-                pz = pz + sgn * PICK_UP_SPEED * t_elap;
+                pz = pz + sgn * ARM_SPEED * t_elap;
 
                 if (dir == "down")
                 {
