@@ -3,8 +3,8 @@
 
 #include <map>
 
+#include <robot_utils/ros_thread.h>
 #include <robot_interface/robot_interface.h>
-#include <robot_interface/ros_thread.h>
 
 #include "baxter_control/DoAction.h"
 #include "baxter_control/ArmState.h"
