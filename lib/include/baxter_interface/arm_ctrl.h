@@ -37,7 +37,7 @@ private:
 
     geometry_msgs::Point        _desired_pos;
 
-    baxter_core_msgs::JointCommand home_conf;
+    std::vector<double> home_conf;
 
 protected:
 

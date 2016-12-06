@@ -116,7 +116,6 @@ void ArmCtrl::InternalThreadEntry()
     geometry_msgs::Point currPos;
     geometry_msgs::Point difference;
     geometry_msgs::Quaternion ori;
-    vector<double> joint_angles;
     float start_x;
     float start_y;
     float start_z;
@@ -166,8 +165,7 @@ void ArmCtrl::InternalThreadEntry()
                 ROS_INFO_THROTTLE(0.5,"desired x:%f desired y:%f desired z:%f", desiredPos.x, desiredPos.y, desiredPos.z);
                 ROS_INFO_THROTTLE(0.5,"update flag:%i", update_flag);
 
-                computeIK(px, py, pz, ori.x, ori.y, ori.z, ori.w, joint_angles);
-                goToJointPoseNoCheck(joint_angles);
+                goToPoseNoCheck(px, py, pz, ori.x, ori.y, ori.z, ori.w);
                 ++i;
                 r.sleep();
             }
@@ -511,12 +509,8 @@ bool ArmCtrl::moveArm(string dir, double dist, string mode, bool disable_coll_av
         double oz = ori.z;
         double ow = ori.w;
 
-        vector<double> joint_angles;
-        if (!computeIK(px, py, pz, ox, oy, oz, ow, joint_angles)) return false;
-
-        if (!goToJointPoseNoCheck(joint_angles))   return false;
-
-        if (isPositionReached(final.x, final.y, final.z, mode)) return true;
+        if (!goToPoseNoCheck(px, py, pz, ox, oy, oz, ow))       return false;
+        if (isPositionReached(final.x, final.y, final.z, mode))  return true;
 
         r.sleep();
     }
@@ -544,32 +538,31 @@ bool ArmCtrl::homePoseStrict(bool disable_coll_av)
     ROS_INFO("[%s] Going to home position strict..", getLimb().c_str());
 
     ros::Rate r(100);
-    while(ros::ok())
+    while(RobotInterface::ok() && !isConfigurationReached(home_conf))
     {
         if (disable_coll_av)    suppressCollisionAv();
-        JointCommand joint_cmd;
-        joint_cmd.mode = JointCommand::POSITION_MODE;
-        setJointNames(joint_cmd);
 
-        joint_cmd.command = home_conf.command;
-
-        publish_joint_cmd(joint_cmd);
+        goToJointConfNoCheck(home_conf);
 
         r.sleep();
-
-        if(isConfigurationReached(joint_cmd))
-        {
-            return true;
-        }
-        ROS_DEBUG("Debug");
     }
-    ROS_INFO("[%s] Done", getLimb().c_str());
+
+    return true;
 }
 
 void ArmCtrl::setHomeConf(double s0, double s1, double e0, double e1,
                                      double w0, double w1, double w2)
 {
-    setJointCommands( s0, s1, e0, e1, w0, w1, w2, home_conf);
+    home_conf.clear();
+    home_conf.push_back(s0);
+    home_conf.push_back(s1);
+    home_conf.push_back(e0);
+    home_conf.push_back(e1);
+    home_conf.push_back(w0);
+    home_conf.push_back(w1);
+    home_conf.push_back(w2);
+
+    return;
 }
 
 bool ArmCtrl::goHome()
