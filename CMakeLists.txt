@@ -120,7 +120,6 @@ include_directories(lib/include
                     ${OpenCV_INCLUDE_DIRS}
                     ${catkin_INCLUDE_DIRS}
                     ${CMAKE_CURRENT_SOURCE_DIR})
-message(${catkin_INCLUDE_DIRS})
 
 ## Add C++ libraries
 add_subdirectory(lib)
