@@ -83,9 +83,8 @@ void ArmCtrl::InternalThreadEntry()
     float pz;
     float norm;
     double t_elap = 0;
-    double t_now = 0;
     double t_last = 0;
-    double t_inc;
+    double t_inc = 0;
     ros::Time start_time;
     float time_to_dest;
     ros::Rate r(100);
@@ -104,9 +103,9 @@ void ArmCtrl::InternalThreadEntry()
                 currPos = getPos();
                 if (update_flag) {
                     ROS_INFO("We've got a new desired position!!!!!!!!!!!!!");
-                    t_now = ros::Time::now().toSec();
-                    t_last = ros::Time::now().toSec();
                     t_elap = 0;
+                    t_inc = 0;
+                    start_time = ros::Time::now();
                     start_x = currPos.x;
                     start_y = currPos.y;
                     start_z = currPos.z;
@@ -115,24 +114,26 @@ void ArmCtrl::InternalThreadEntry()
                     time_to_dest = norm / PICK_UP_SPEED;
                     update_flag = 0;
                 }
-                t_now = ros::Time::now().toSec();
-                t_inc = t_now - t_last;
+                if ((ros::Time::now() - start_time).toSec() > 0.005)
+                    t_inc = (ros::Time::now() - start_time).toSec() - t_elap;
+                t_last = t_elap;
                 t_elap += t_inc;
-                ROS_INFO_THROTTLE(0.5,"t_elap: %f t_inc %f", t_elap, t_inc);
                 px = start_x + (difference.x / norm)  * PICK_UP_SPEED * t_elap;
                 py = start_y + (difference.y / norm)  * PICK_UP_SPEED * t_elap;
                 pz = start_z + (difference.z / norm)  * PICK_UP_SPEED * t_elap;
 
-                ROS_INFO_THROTTLE(0.5,"curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
-                ROS_INFO_THROTTLE(0.5,"px:%f py:%f pz:%f", px, py, pz);
-                ROS_INFO_THROTTLE(0.5,"orix:%f oriy:%f oriz%f", ori.x, ori.y, ori.z);
-                ROS_INFO_THROTTLE(0.5,"actual orix:%f actual oriy:%f actual oriz%f", getOri().x, getOri().y, getOri().z);
-                ROS_INFO_THROTTLE(0.5,"desired x:%f desired y:%f desired z:%f", desiredPos.x, desiredPos.y, desiredPos.z);
+                // ROS_INFO_THROTTLE(0.5,"curr x:%f curr y:%f curr z:%f", currPos.x, currPos.y, currPos.z);
+                // ROS_INFO_THROTTLE(0.5,"px:%f py:%f pz:%f", px, py, pz);
+                // ROS_INFO_THROTTLE(0.5,"orix:%f oriy:%f oriz%f", ori.x, ori.y, ori.z);
+                // ROS_INFO_THROTTLE(0.5,"actual orix:%f actual oriy:%f actual oriz%f", getOri().x, getOri().y, getOri().z);
+                // ROS_INFO_THROTTLE(0.5,"desired x:%f desired y:%f desired z:%f", desiredPos.x, desiredPos.y, desiredPos.z);
                 // ROS_INFO_THROTTLE(0.5,"update flag:%i", update_flag);
-
-                updateVelocities(px, py, pz, ori.x, ori.y, ori.z, ori.w, t_inc);
-                ++i;
-                t_last = t_now;
+                // ROS_INFO_THROTTLE(0.5, "px: %f py: %f pz: %f", px, py, pz);
+                if (t_elap < time_to_dest && t_inc != 0) {
+                    updateVelocities(px, py, pz, ori.x, ori.y, ori.z, ori.w, t_inc);
+                } else if (t_inc != 0) {
+                    updateVelocities(desiredPos.x, desiredPos.y, desiredPos.z, ori.x, ori.y, ori.z, ori.w, t_inc);
+                }
                 r.sleep();
             }
             ROS_INFO("POSITION REACHED!!");
